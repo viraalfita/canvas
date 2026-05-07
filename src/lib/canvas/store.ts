@@ -1,0 +1,148 @@
+"use client";
+
+import { create } from "zustand";
+import type { Edge, Node } from "@xyflow/react";
+import type { CanvasNodeRow, NodeOutput, NodeStatus, NodeUsage } from "./types";
+
+export type FlowNodeData = {
+  nodeType: CanvasNodeRow["type"];
+  status: NodeStatus;
+  params: Record<string, unknown>;
+  output: NodeOutput | null;
+  error: string | null;
+  usage: NodeUsage | null;
+};
+
+type State = {
+  workflowId: string | null;
+  nodes: Node<FlowNodeData>[];
+  edges: Edge[];
+  isPolling: boolean;
+  /** Bumped every time polling completes a workflow (for refreshing balance, etc). */
+  pollCompletionTick: number;
+};
+
+type Actions = {
+  setWorkflowId: (id: string) => void;
+  setNodes: (
+    updater:
+      | Node<FlowNodeData>[]
+      | ((prev: Node<FlowNodeData>[]) => Node<FlowNodeData>[]),
+  ) => void;
+  setEdges: (updater: Edge[] | ((prev: Edge[]) => Edge[])) => void;
+  patchNodeData: (id: string, patch: Partial<FlowNodeData>) => void;
+  /** Hydrate node data from server-shaped rows (used after polling tick). */
+  hydrateFromRows: (rows: CanvasNodeRow[]) => void;
+  startPolling: () => void;
+  stopPolling: () => void;
+};
+
+// Module-level interval reference; survives re-renders without putting
+// raw timer ids into the Zustand store.
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+export const useCanvasStore = create<State & Actions>((set, get) => ({
+  workflowId: null,
+  nodes: [],
+  edges: [],
+  isPolling: false,
+  pollCompletionTick: 0,
+
+  setWorkflowId: (id) => set({ workflowId: id }),
+
+  setNodes: (updater) =>
+    set((s) => ({
+      nodes:
+        typeof updater === "function"
+          ? (updater as (prev: Node<FlowNodeData>[]) => Node<FlowNodeData>[])(
+              s.nodes,
+            )
+          : updater,
+    })),
+  setEdges: (updater) =>
+    set((s) => ({
+      edges:
+        typeof updater === "function"
+          ? (updater as (prev: Edge[]) => Edge[])(s.edges)
+          : updater,
+    })),
+  patchNodeData: (id, patch) =>
+    set((s) => ({
+      nodes: s.nodes.map((n) =>
+        n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
+      ),
+    })),
+  hydrateFromRows: (rows) =>
+    set((s) => {
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      return {
+        nodes: s.nodes.map((n) => {
+          const row = byId.get(n.id);
+          if (!row) return n;
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              status: row.status,
+              params: row.params,
+              output: row.output,
+              error: row.error,
+              usage: row.usage,
+            },
+          };
+        }),
+      };
+    }),
+
+  startPolling: () => {
+    if (pollTimer) return;
+    set({ isPolling: true });
+    const tick = async () => {
+      const wfId = get().workflowId;
+      if (!wfId) return;
+      try {
+        const res = await fetch(`/api/workflow/${wfId}/tick`, {
+          method: "POST",
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          hasPending: boolean;
+          nodes?: CanvasNodeRow[];
+        };
+        if (Array.isArray(json.nodes)) {
+          get().hydrateFromRows(json.nodes);
+        }
+        if (!json.hasPending) {
+          get().stopPolling();
+          set((s) => ({ pollCompletionTick: s.pollCompletionTick + 1 }));
+        }
+      } catch (e) {
+        console.error("tick failed", e);
+      }
+    };
+    void tick(); // run immediately
+    pollTimer = setInterval(tick, 2500);
+  },
+
+  stopPolling: () => {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+    set({ isPolling: false });
+  },
+}));
+
+export function rowToFlowNode(row: CanvasNodeRow): Node<FlowNodeData> {
+  return {
+    id: row.id,
+    type: row.type,
+    position: { x: row.position_x, y: row.position_y },
+    data: {
+      nodeType: row.type,
+      status: row.status,
+      params: row.params,
+      output: row.output,
+      error: row.error,
+      usage: row.usage,
+    },
+  };
+}

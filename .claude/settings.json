@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.apimart.ai)",
+      "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
+      "Bash(NEXT_PUBLIC_SUPABASE_URL=https://x.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy SUPABASE_SERVICE_ROLE_KEY=dummy APIMART_API_KEY=dummy pnpm build)",
+      "Bash(pnpm exec *)",
+      "Bash(pnpm lint *)",
+      "Bash(NEXT_PUBLIC_SUPABASE_URL=https://x.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy SUPABASE_SERVICE_ROLE_KEY=dummy APIMART_API_KEY=dummy INTERNAL_LLM_API_KEY=dummy pnpm build)"
+    ]
+  }
+}

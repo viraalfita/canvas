@@ -33,13 +33,20 @@ type Actions = {
   patchNodeData: (id: string, patch: Partial<FlowNodeData>) => void;
   /** Hydrate node data from server-shaped rows (used after polling tick). */
   hydrateFromRows: (rows: CanvasNodeRow[]) => void;
-  startPolling: () => void;
+  /** When `cascade` is true (Run all), the polling tick auto-fires downstream
+   *  nodes as their inputs become ready. When false (per-node Run), the tick
+   *  only polls the currently-running task without dispatching anything new.
+   *  When `sequential` is true and cascade is true, only one token-spending
+   *  node is dispatched at a time — the next waits for the previous to finish. */
+  startPolling: (cascade?: boolean, sequential?: boolean) => void;
   stopPolling: () => void;
 };
 
-// Module-level interval reference; survives re-renders without putting
-// raw timer ids into the Zustand store.
+// Module-level state for the polling loop. Survives re-renders without
+// putting raw timer ids into the Zustand store.
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let pollCascade = true;
+let pollSequential = false;
 
 export const useCanvasStore = create<State & Actions>((set, get) => ({
   workflowId: null,
@@ -94,15 +101,33 @@ export const useCanvasStore = create<State & Actions>((set, get) => ({
       };
     }),
 
-  startPolling: () => {
+  startPolling: (cascade = true, sequential = false) => {
+    // Updating cascade/sequential mid-poll is allowed.
+    pollCascade = cascade;
+    pollSequential = sequential;
     if (pollTimer) return;
     set({ isPolling: true });
     const tick = async () => {
       const wfId = get().workflowId;
       if (!wfId) return;
       try {
+        // Client-side preprocess: extract last frames from upstream Video
+        // outputs into image inputs for downstream Video nodes. Done here
+        // before the server tick so the next dispatch can use the cached URL.
+        try {
+          const { preprocessUpstreamVideos } = await import("./preprocess");
+          await preprocessUpstreamVideos();
+        } catch (e) {
+          console.error("preprocess failed", e);
+        }
+
         const res = await fetch(`/api/workflow/${wfId}/tick`, {
           method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            cascade: pollCascade,
+            sequential: pollSequential,
+          }),
         });
         if (!res.ok) return;
         const json = (await res.json()) as {

@@ -156,7 +156,16 @@ async function submitVideoNode(
   const merged = {
     ...(node.params as Partial<VideoGenerateParams>),
     ...overrideParams,
-  } as Partial<VideoGenerateParams>;
+  } as Partial<VideoGenerateParams> & {
+    _extractedFrameUrl?: string;
+  };
+
+  // If a previous tick extracted the last frame from an upstream Video, use
+  // it as the FIRST image input — it represents this scene's starting frame
+  // and gives visual continuity with the previous scene.
+  const finalImageUrls = merged._extractedFrameUrl
+    ? [merged._extractedFrameUrl, ...upstreamImageUrls]
+    : upstreamImageUrls;
   const effectivePrompt =
     merged.enhancedPrompt?.trim() || merged.prompt?.trim() || "";
   if (!effectivePrompt) {
@@ -175,7 +184,7 @@ async function submitVideoNode(
       resolution: merged.resolution,
       duration: merged.duration,
       audio: merged.audio,
-      imageUrls: upstreamImageUrls.length ? upstreamImageUrls : undefined,
+      imageUrls: finalImageUrls.length ? finalImageUrls : undefined,
     });
     await setNode(ctx, node.id, {
       status: "running",
@@ -229,42 +238,105 @@ function collectUpstream(
   return { outputs, usages };
 }
 
+/** Whether a node type spends APImart tokens / takes meaningful time. Used by
+ *  sequential mode to decide what counts as "currently busy". Export, upload,
+ *  storyboard, scene_composer don't burn tokens or run async via APImart. */
+function isApimartBacked(t: string): boolean {
+  return (
+    t === "image_generate" ||
+    t === "image_edit" ||
+    t === "image_merge" ||
+    t === "video_generate"
+  );
+}
+
+/** Returns true if the node depends on a Video output but the client hasn't
+ *  yet extracted its last frame. Used to defer dispatch until preprocessing
+ *  finishes. */
+function isAwaitingFrameExtraction(
+  node: CanvasNodeRow,
+  upstream: { outputs: NodeOutput[]; usages: (NodeUsage | null)[] },
+): boolean {
+  if ((node.type as string) !== "video_generate") return false;
+  const hasUpstreamVideo = upstream.outputs.some((o) => o.kind === "video");
+  if (!hasUpstreamVideo) return false;
+  const params = node.params as Record<string, unknown>;
+  return !params._extractedFrameUrl;
+}
+
+async function dispatchSingle(
+  ctx: WorkflowContext,
+  node: CanvasNodeRow,
+  upstream: { outputs: NodeOutput[]; usages: (NodeUsage | null)[] },
+) {
+  const t = node.type as string;
+  if (t === "image_generate" || t === "image_edit" || t === "image_merge") {
+    const upstreamImages = upstream.outputs
+      .filter((o) => o.kind === "image")
+      .map((o) => o.url);
+    await submitImageNode(ctx, node, upstreamImages);
+  } else if (t === "video_generate") {
+    const upstreamImages = upstream.outputs
+      .filter((o) => o.kind === "image")
+      .map((o) => o.url);
+    await submitVideoNode(ctx, node, upstreamImages);
+  } else if (t === "export") {
+    await resolveExportNode(
+      ctx,
+      node,
+      upstream.outputs[0] ?? null,
+      upstream.usages[0] ?? null,
+    );
+  }
+  // image_upload, storyboard, scene_composer: not dispatched here.
+}
+
 /**
- * Process every node that is currently "ready" (or idle with no inputs).
- * Image nodes get submitted to APImart; export nodes propagate immediately.
+ * Process nodes that are currently "ready" (deps satisfied).
+ *
+ * - In **parallel** mode (default): every ready node fires immediately.
+ * - In **sequential** mode: at most ONE token-spending node is ever submitted
+ *   per call. If something is already running, do nothing. Otherwise submit
+ *   the first ready node and return. Cheap "instant" nodes (export) are still
+ *   resolved in the same pass to avoid stalling the queue on free work.
  */
-async function dispatchReadyNodes(ctx: WorkflowContext) {
+async function dispatchReadyNodes(
+  ctx: WorkflowContext,
+  opts: { sequential?: boolean } = {},
+) {
   const { nodes, edges } = await loadGraph(ctx);
+
+  if (opts.sequential) {
+    // If anything is already running, hold off — wait for it to finish.
+    const busy = nodes.some(
+      (n) => n.status === "running" || n.status === "queued",
+    );
+    if (busy) return;
+
+    for (const node of nodes) {
+      if (node.status !== "idle" && node.status !== "queued") continue;
+      if (readinessOf(node, nodes, edges) !== "ready") continue;
+      const upstream = collectUpstream(node, nodes, edges);
+      // Hold the dispatch if the client still needs to extract an upstream
+      // video's last frame. The next polling tick will retry once the
+      // preprocess step caches the frame URL.
+      if (isAwaitingFrameExtraction(node, upstream)) continue;
+      await dispatchSingle(ctx, node, upstream);
+      // Stop after the first token-spending dispatch so the user can review
+      // before the next one fires. Cheap nodes (export) finish synchronously
+      // and we keep looping to drain them.
+      if (isApimartBacked(node.type as string)) return;
+    }
+    return;
+  }
+
+  // Parallel mode — fire everything that's ready.
   for (const node of nodes) {
     if (node.status !== "idle" && node.status !== "queued") continue;
     if (readinessOf(node, nodes, edges) !== "ready") continue;
-
     const upstream = collectUpstream(node, nodes, edges);
-
-    // Legacy types image_edit / image_merge are accepted as string until the
-    // DB migration runs; treat them identically to image_generate.
-    const t = node.type as string;
-    if (t === "image_generate" || t === "image_edit" || t === "image_merge") {
-      const upstreamImages = upstream.outputs
-        .filter((o) => o.kind === "image")
-        .map((o) => o.url);
-      // Image Generate handles T2I, edit, and merge — upstream images optional.
-      await submitImageNode(ctx, node, upstreamImages);
-    } else if (t === "video_generate") {
-      const upstreamImages = upstream.outputs
-        .filter((o) => o.kind === "image")
-        .map((o) => o.url);
-      await submitVideoNode(ctx, node, upstreamImages);
-    } else if (t === "export") {
-      await resolveExportNode(
-        ctx,
-        node,
-        upstream.outputs[0] ?? null,
-        upstream.usages[0] ?? null,
-      );
-    }
-    // image_upload nodes don't get dispatched here — their output is set
-    // directly from the client when the user picks a file.
+    if (isAwaitingFrameExtraction(node, upstream)) continue;
+    await dispatchSingle(ctx, node, upstream);
   }
 }
 
@@ -342,7 +414,10 @@ async function pollRunningNodes(ctx: WorkflowContext) {
   }
 }
 
-export async function runWorkflow(ctx: WorkflowContext) {
+export async function runWorkflow(
+  ctx: WorkflowContext,
+  opts: { sequential?: boolean } = {},
+) {
   // Reset previously-finished nodes so they can re-run. Skip `image_upload`
   // because their output is user-provided, not generated.
   await ctx.supabase
@@ -357,21 +432,51 @@ export async function runWorkflow(ctx: WorkflowContext) {
     .eq("workflow_id", ctx.workflowId)
     .in("status", ["failed", "success"])
     .neq("type", "image_upload");
-  await dispatchReadyNodes(ctx);
+  await dispatchReadyNodes(ctx, { sequential: opts.sequential });
 }
 
-export async function tickWorkflow(ctx: WorkflowContext) {
+export async function tickWorkflow(
+  ctx: WorkflowContext,
+  opts: {
+    /** When true (Run all), dispatch any newly-ready downstream nodes after
+     *  polling. When false (per-node Run), only poll the running task — no
+     *  cascade through the dependency graph. Defaults to true. */
+    cascade?: boolean;
+    /** When true, only one token-spending node is dispatched per tick — wait
+     *  for it to finish before firing the next. Saves tokens when an early
+     *  scene's output is bad and the user wants to abort. */
+    sequential?: boolean;
+  } = {},
+) {
   await pollRunningNodes(ctx);
-  await dispatchReadyNodes(ctx);
-  const { data: nodes } = await ctx.supabase
-    .from("nodes")
-    .select("*")
-    .eq("workflow_id", ctx.workflowId);
-  const rows = (nodes ?? []) as CanvasNodeRow[];
-  const hasPending = rows.some(
+  if (opts.cascade !== false) {
+    await dispatchReadyNodes(ctx, { sequential: opts.sequential });
+  }
+  const { nodes, edges } = await loadGraph(ctx);
+  const hasRunningOrQueued = nodes.some(
     (n) => n.status === "running" || n.status === "queued",
   );
-  return { hasPending, nodes: rows };
+  // Keep polling alive while any Video node is idle but its upstream Video
+  // hasn't been frame-extracted yet — the client preprocess step running
+  // alongside this tick will eventually fill in `_extractedFrameUrl`.
+  const hasAwaitingPreprocess = nodes.some((node) => {
+    if ((node.type as string) !== "video_generate") return false;
+    if (node.status !== "idle") return false;
+    const inc = incomingEdges(edges, node.id);
+    const hasVideoUpstream = inc.some((e) => {
+      const src = findNode(nodes, e.source_node_id);
+      return (
+        src?.output?.kind === "video" &&
+        src.status === "success" &&
+        !!src.output.url
+      );
+    });
+    if (!hasVideoUpstream) return false;
+    const params = node.params as Record<string, unknown>;
+    return !params._extractedFrameUrl;
+  });
+  const hasPending = hasRunningOrQueued || hasAwaitingPreprocess;
+  return { hasPending, nodes };
 }
 
 /**

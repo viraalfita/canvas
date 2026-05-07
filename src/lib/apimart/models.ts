@@ -134,7 +134,7 @@ export const IMAGE_MODELS: ImageModel[] = [
   },
 ];
 
-export const DEFAULT_IMAGE_MODEL: ImageModelId = "doubao-seedream-5-0-lite";
+export const DEFAULT_IMAGE_MODEL: ImageModelId = "gpt-image-2";
 
 export function findModel(id: string | undefined): ImageModel {
   return (

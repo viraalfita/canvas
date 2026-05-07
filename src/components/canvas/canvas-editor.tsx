@@ -246,14 +246,39 @@ function CanvasEditorInner({
 /**
  * Helper used by node components so they can debounce param saves
  * without needing a callback in the FlowNodeData payload.
+ *
+ * `flushPendingSaves()` lets the toolbar / per-node Run buttons immediately
+ * commit any in-flight debounced writes BEFORE triggering a generation, so
+ * the backend reads fresh params (model, prompt, etc) from the DB.
  */
-const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+type Pending = {
+  params: Record<string, unknown>;
+  timer: ReturnType<typeof setTimeout>;
+};
+const pending = new Map<string, Pending>();
+
 export function commitNodeParams(id: string, params: Record<string, unknown>) {
   useCanvasStore.getState().patchNodeData(id, { params });
-  const existing = debounceTimers.get(id);
-  if (existing) clearTimeout(existing);
-  const t = setTimeout(() => {
+  const existing = pending.get(id);
+  if (existing) clearTimeout(existing.timer);
+  const timer = setTimeout(() => {
     updateNodeParams({ id, params }).catch(console.error);
+    pending.delete(id);
   }, 400);
-  debounceTimers.set(id, t);
+  pending.set(id, { params, timer });
+}
+
+export async function flushPendingSaves(): Promise<void> {
+  const all = Array.from(pending.entries());
+  pending.clear();
+  await Promise.all(
+    all.map(async ([id, { params, timer }]) => {
+      clearTimeout(timer);
+      try {
+        await updateNodeParams({ id, params });
+      } catch (e) {
+        console.error("flush save failed", e);
+      }
+    }),
+  );
 }

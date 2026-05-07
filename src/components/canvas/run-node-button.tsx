@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PlayIcon } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { flushPendingSaves } from "./canvas-editor";
 
 export function RunNodeButton({ nodeId }: { nodeId: string }) {
   const [busy, setBusy] = useState(false);
@@ -14,6 +15,9 @@ export function RunNodeButton({ nodeId }: { nodeId: string }) {
     if (!workflowId) return;
     setBusy(true);
     try {
+      // Flush any in-flight debounced param saves so backend reads fresh
+      // model/prompt/etc from DB.
+      await flushPendingSaves();
       const res = await fetch(
         `/api/workflow/${workflowId}/nodes/${nodeId}/run`,
         { method: "POST" },
@@ -23,7 +27,8 @@ export function RunNodeButton({ nodeId }: { nodeId: string }) {
         alert(json.error ?? `Run failed (${res.status})`);
         return;
       }
-      startPolling();
+      // cascade=false → only this node's task is polled; downstream stays idle.
+      startPolling(false);
     } finally {
       setBusy(false);
     }

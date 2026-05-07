@@ -5,14 +5,24 @@ import {
   DEFAULT_PARAMS,
   type CanvasEdgeRow,
   type CanvasNodeRow,
+  type ImageGenerateParams,
   type NodeOutput,
   type NodeOutputHistoryRow,
   type NodeStatus,
   type NodeType,
+  type StoryboardChainMode,
+  type StoryboardOutputMode,
   type StoryboardScene,
   type VideoGenerateParams,
 } from "./types";
-import { DEFAULT_VIDEO_MODEL } from "@/lib/apimart/video-models";
+import {
+  DEFAULT_VIDEO_MODEL,
+  coerceVideoParamsForModel,
+} from "@/lib/apimart/video-models";
+import {
+  DEFAULT_IMAGE_MODEL,
+  coerceParamsForModel,
+} from "@/lib/apimart/models";
 
 async function authed() {
   const supabase = await createClient();
@@ -146,83 +156,284 @@ export async function createSceneNodesFromStoryboard(input: {
   scenes: StoryboardScene[];
   /** Position of the Storyboard node — used to lay out new nodes nearby. */
   origin?: { x: number; y: number };
+  /** Output topology: video only, image only, or image → video → composer. */
+  outputMode?: StoryboardOutputMode;
+  /** How to wire image inputs across scenes (parallel or sequential chain). */
+  chainMode?: StoryboardChainMode;
+  /** Optional reference image to be applied to every auto-generated scene
+   *  as an `image_input` upstream — for character/style consistency. */
+  referenceImage?: { url: string; mimeType: string; filename?: string };
 }): Promise<{ nodes: CanvasNodeRow[]; edges: CanvasEdgeRow[] }> {
   const { supabase } = await authed();
   if (input.scenes.length === 0) {
     return { nodes: [], edges: [] };
   }
 
+  const mode: StoryboardOutputMode = input.outputMode ?? "video";
+  const chain: StoryboardChainMode = input.chainMode ?? "parallel";
+  const wantsImages = mode === "image" || mode === "image-then-video";
+  const wantsVideos = mode === "video" || mode === "image-then-video";
+
   const ox = input.origin?.x ?? 0;
   const oy = input.origin?.y ?? 0;
+  const GAP_Y = 280;
+  const hasRef = !!input.referenceImage;
 
-  // Layout: Video nodes stacked vertically to the right of Storyboard,
-  // Scene Composer further right.
-  const VIDEO_X = ox + 360;
-  const VIDEO_GAP_Y = 280;
-  const COMPOSER_X = VIDEO_X + 320;
+  // Column layout:
+  //   col_ref     col_image    col_video    col_composer
+  //   (ref?)      (image?)     (video?)     (video? & need composer)
+  let nextX = ox + 360;
+  const refX = hasRef ? nextX : null;
+  if (hasRef) nextX += 360;
 
-  // Insert Video nodes
-  const videoRows = input.scenes.map((scene, i) => {
-    const prompt = scene.cameraMovement
-      ? `${scene.prompt}, ${scene.cameraMovement}`
-      : scene.prompt;
-    const params = {
-      prompt,
-      enhancedPrompt: prompt, // already detailed English from the LLM
-      model: DEFAULT_VIDEO_MODEL,
-      aspectRatio: "16:9",
-      resolution: "720p",
-      duration: scene.duration ?? 5,
-      audio: false,
-    } satisfies VideoGenerateParams;
-    return {
-      workflow_id: input.workflowId,
-      type: "video_generate" as NodeType,
-      position_x: VIDEO_X,
-      position_y: oy + i * VIDEO_GAP_Y,
-      params,
-    };
+  const imageX = wantsImages ? nextX : null;
+  if (wantsImages) nextX += 360;
+
+  const videoX = wantsVideos ? nextX : null;
+  if (wantsVideos) nextX += 360;
+
+  const composerX = wantsVideos ? nextX : null;
+
+  // 1) Reference Image Upload node
+  let uploadNode: CanvasNodeRow | null = null;
+  if (input.referenceImage && refX != null) {
+    const { data, error } = await supabase
+      .from("nodes")
+      .insert({
+        workflow_id: input.workflowId,
+        type: "image_upload",
+        position_x: refX,
+        position_y: oy,
+        params: { filename: input.referenceImage.filename ?? "reference" },
+        output: {
+          kind: "image",
+          url: input.referenceImage.url,
+          mimeType: input.referenceImage.mimeType,
+        },
+        status: "success",
+      })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    uploadNode = data as CanvasNodeRow;
+  }
+
+  // 2) Image generate nodes (one per scene)
+  let imageNodes: CanvasNodeRow[] = [];
+  if (wantsImages && imageX != null) {
+    // Coerce against the default model so size/resolution are valid even if
+    // the chosen default doesn't accept "9:16" exactly (it does for gpt-image-2,
+    // but this keeps things safe if the default model changes later).
+    const coercedImg = coerceParamsForModel(DEFAULT_IMAGE_MODEL, {
+      size: "9:16",
+      resolution: "2K",
+    });
+    const rows = input.scenes.map((scene, i) => {
+      const params = {
+        prompt: scene.prompt,
+        enhancedPrompt: scene.prompt,
+        model: coercedImg.model,
+        size: coercedImg.size,
+        resolution: coercedImg.resolution,
+      } satisfies ImageGenerateParams;
+      return {
+        workflow_id: input.workflowId,
+        type: "image_generate" as NodeType,
+        position_x: imageX,
+        position_y: oy + i * GAP_Y,
+        params,
+      };
+    });
+    const { data, error } = await supabase.from("nodes").insert(rows).select();
+    if (error) throw new Error(error.message);
+    imageNodes = (data ?? []) as CanvasNodeRow[];
+  }
+
+  // 3) Video generate nodes (one per scene)
+  let videoNodes: CanvasNodeRow[] = [];
+  if (wantsVideos && videoX != null) {
+    const rows = input.scenes.map((scene, i) => {
+      const prompt = scene.cameraMovement
+        ? `${scene.prompt}, ${scene.cameraMovement}`
+        : scene.prompt;
+      // Coerce per-scene against the default video model so duration falls
+      // back to a valid value (e.g. VEO is fixed 8s — scene.duration of 5
+      // would produce an invalid select state).
+      const coercedVid = coerceVideoParamsForModel(DEFAULT_VIDEO_MODEL, {
+        aspectRatio: "9:16",
+        resolution: "720p",
+        duration: scene.duration,
+      });
+      const params = {
+        prompt,
+        enhancedPrompt: prompt,
+        model: coercedVid.model,
+        aspectRatio: coercedVid.aspectRatio,
+        resolution: coercedVid.resolution,
+        duration: coercedVid.duration,
+        audio: false,
+      } satisfies VideoGenerateParams;
+      return {
+        workflow_id: input.workflowId,
+        type: "video_generate" as NodeType,
+        position_x: videoX,
+        position_y: oy + i * GAP_Y,
+        params,
+      };
+    });
+    const { data, error } = await supabase.from("nodes").insert(rows).select();
+    if (error) throw new Error(error.message);
+    videoNodes = (data ?? []) as CanvasNodeRow[];
+  }
+
+  // 4) Scene Composer (only when there are videos to combine)
+  let composerNode: CanvasNodeRow | null = null;
+  if (wantsVideos && composerX != null) {
+    const composerY = oy + ((input.scenes.length - 1) * GAP_Y) / 2;
+    const { data, error } = await supabase
+      .from("nodes")
+      .insert({
+        workflow_id: input.workflowId,
+        type: "scene_composer",
+        position_x: composerX,
+        position_y: composerY,
+        params: { transition: "cut" },
+      })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    composerNode = data as CanvasNodeRow;
+  }
+
+  // 5) Edges
+  type EdgeRow = {
+    workflow_id: string;
+    source_node_id: string;
+    source_handle: string;
+    target_node_id: string;
+    target_handle: string;
+  };
+  const edgeRows: EdgeRow[] = [];
+
+  // 5a) First-stage targets are Image nodes if they exist, otherwise Videos.
+  //     This is what the reference image (if any) and the sequential chain
+  //     operate on.
+  const firstStage =
+    imageNodes.length > 0 ? imageNodes : videoNodes;
+
+  if (chain === "sequential") {
+    // Reference → first node only; each scene continues from previous.
+    if (uploadNode && firstStage.length > 0) {
+      edgeRows.push({
+        workflow_id: input.workflowId,
+        source_node_id: uploadNode.id,
+        source_handle: "image_output",
+        target_node_id: firstStage[0].id,
+        target_handle: "image_input",
+      });
+    }
+    for (let i = 0; i < firstStage.length - 1; i++) {
+      edgeRows.push({
+        workflow_id: input.workflowId,
+        source_node_id: firstStage[i].id,
+        source_handle: "image_output",
+        target_node_id: firstStage[i + 1].id,
+        target_handle: "image_input",
+      });
+    }
+  } else {
+    // Parallel: reference (if any) goes to every first-stage node.
+    if (uploadNode) {
+      for (const t of firstStage) {
+        edgeRows.push({
+          workflow_id: input.workflowId,
+          source_node_id: uploadNode.id,
+          source_handle: "image_output",
+          target_node_id: t.id,
+          target_handle: "image_input",
+        });
+      }
+    }
+  }
+
+  // 5b) Image → Video pairing (image-then-video mode, regardless of chain mode)
+  if (mode === "image-then-video" && imageNodes.length === videoNodes.length) {
+    for (let i = 0; i < imageNodes.length; i++) {
+      edgeRows.push({
+        workflow_id: input.workflowId,
+        source_node_id: imageNodes[i].id,
+        source_handle: "image_output",
+        target_node_id: videoNodes[i].id,
+        target_handle: "image_input",
+      });
+    }
+  }
+
+  // 5c) Video → Scene Composer
+  if (composerNode) {
+    for (const v of videoNodes) {
+      edgeRows.push({
+        workflow_id: input.workflowId,
+        source_node_id: v.id,
+        source_handle: "video_output",
+        target_node_id: composerNode.id,
+        target_handle: "video_input",
+      });
+    }
+  }
+
+  let savedEdges: CanvasEdgeRow[] = [];
+  if (edgeRows.length > 0) {
+    const { data, error } = await supabase
+      .from("edges")
+      .insert(edgeRows)
+      .select();
+    if (error) throw new Error(error.message);
+    savedEdges = (data ?? []) as CanvasEdgeRow[];
+  }
+
+  const allNodes: CanvasNodeRow[] = [
+    ...(uploadNode ? [uploadNode] : []),
+    ...imageNodes,
+    ...videoNodes,
+    ...(composerNode ? [composerNode] : []),
+  ];
+  return { nodes: allNodes, edges: savedEdges };
+}
+
+/** Create a single Image Generate node from one storyboard scene. Caller
+ *  decides where to place it. Used by per-scene "+ Image" buttons when the
+ *  user wants to materialize storyboard frames one by one. */
+export async function createImageFromScene(input: {
+  workflowId: string;
+  scene: StoryboardScene;
+  position: { x: number; y: number };
+}): Promise<CanvasNodeRow> {
+  const { supabase } = await authed();
+  const coerced = coerceParamsForModel(DEFAULT_IMAGE_MODEL, {
+    size: "9:16",
+    resolution: "2K",
   });
-
-  const { data: videos, error: vErr } = await supabase
-    .from("nodes")
-    .insert(videoRows)
-    .select();
-  if (vErr) throw new Error(vErr.message);
-
-  // Insert Scene Composer node
-  const composerY = oy + ((input.scenes.length - 1) * VIDEO_GAP_Y) / 2;
-  const { data: composer, error: cErr } = await supabase
+  const params = {
+    prompt: input.scene.prompt,
+    enhancedPrompt: input.scene.prompt,
+    model: coerced.model,
+    size: coerced.size,
+    resolution: coerced.resolution,
+  } satisfies ImageGenerateParams;
+  const { data, error } = await supabase
     .from("nodes")
     .insert({
       workflow_id: input.workflowId,
-      type: "scene_composer",
-      position_x: COMPOSER_X,
-      position_y: composerY,
-      params: { transition: "cut" },
+      type: "image_generate",
+      position_x: input.position.x,
+      position_y: input.position.y,
+      params,
     })
     .select()
     .single();
-  if (cErr) throw new Error(cErr.message);
-
-  // Connect each Video node → Scene Composer
-  const edgeRows = (videos ?? []).map((v) => ({
-    workflow_id: input.workflowId,
-    source_node_id: v.id,
-    source_handle: "video_output",
-    target_node_id: composer.id,
-    target_handle: "video_input",
-  }));
-  const { data: edges, error: eErr } = await supabase
-    .from("edges")
-    .insert(edgeRows)
-    .select();
-  if (eErr) throw new Error(eErr.message);
-
-  return {
-    nodes: [...(videos as CanvasNodeRow[]), composer as CanvasNodeRow],
-    edges: (edges ?? []) as CanvasEdgeRow[],
-  };
+  if (error) throw new Error(error.message);
+  return data as CanvasNodeRow;
 }
 
 /** Create a single Video node from one storyboard scene. No Scene Composer
@@ -237,13 +448,18 @@ export async function createVideoFromScene(input: {
   const prompt = input.scene.cameraMovement
     ? `${input.scene.prompt}, ${input.scene.cameraMovement}`
     : input.scene.prompt;
+  const coerced = coerceVideoParamsForModel(DEFAULT_VIDEO_MODEL, {
+    aspectRatio: "9:16",
+    resolution: "720p",
+    duration: input.scene.duration,
+  });
   const params = {
     prompt,
     enhancedPrompt: prompt,
-    model: DEFAULT_VIDEO_MODEL,
-    aspectRatio: "16:9",
-    resolution: "720p",
-    duration: input.scene.duration ?? 5,
+    model: coerced.model,
+    aspectRatio: coerced.aspectRatio,
+    resolution: coerced.resolution,
+    duration: coerced.duration,
     audio: false,
   } satisfies VideoGenerateParams;
   const { data, error } = await supabase
@@ -306,6 +522,40 @@ export async function updateNodeParams(input: {
     .from("nodes")
     .update({ params: input.params })
     .eq("id", input.id);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Cache an extracted-last-frame URL on the node's params. Used by the client
+ * preprocessing step to feed an upstream video's final frame into a Video
+ * node as its starting image, enabling visual continuity across scenes.
+ *
+ * `sourceVideoUrl` lets us invalidate the cache when the upstream regenerates.
+ */
+export async function setExtractedFrame(input: {
+  nodeId: string;
+  frameUrl: string;
+  sourceVideoUrl: string;
+}) {
+  const { supabase } = await authed();
+  const { data: row, error: rErr } = await supabase
+    .from("nodes")
+    .select("params")
+    .eq("id", input.nodeId)
+    .maybeSingle();
+  if (rErr) throw new Error(rErr.message);
+  if (!row) throw new Error("Node not found");
+
+  const params = (row.params ?? {}) as Record<string, unknown>;
+  const updated = {
+    ...params,
+    _extractedFrameUrl: input.frameUrl,
+    _extractedFromVideoUrl: input.sourceVideoUrl,
+  };
+  const { error } = await supabase
+    .from("nodes")
+    .update({ params: updated })
+    .eq("id", input.nodeId);
   if (error) throw new Error(error.message);
 }
 

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { runWorkflow } from "@/lib/workflow/execute";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -22,8 +22,16 @@ export async function POST(
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
+  // `sequential`: only dispatch one token-spending node at a time.
+  const body = (await request.json().catch(() => ({}))) as {
+    sequential?: boolean;
+  };
+
   try {
-    await runWorkflow({ supabase, userId: user.id, workflowId: id });
+    await runWorkflow(
+      { supabase, userId: user.id, workflowId: id },
+      { sequential: body.sequential === true },
+    );
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(

@@ -9,10 +9,13 @@ import {
   Loader2Icon,
   ArrowLeftIcon,
   Trash2Icon,
+  ListOrderedIcon,
+  ZapIcon,
 } from "lucide-react";
 import { BalanceIndicator } from "./balance-indicator";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { deleteWorkflow, renameWorkflow } from "@/lib/canvas/actions";
+import { flushPendingSaves } from "./canvas-editor";
 
 export function CanvasToolbar({
   workflowId,
@@ -23,6 +26,9 @@ export function CanvasToolbar({
 }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
+  // Default ON: nodes run one-by-one so the user can review (and abort) each
+  // result before spending more tokens on downstream scenes.
+  const [sequential, setSequential] = useState(true);
   const isPolling = useCanvasStore((s) => s.isPolling);
   const startPolling = useCanvasStore((s) => s.startPolling);
   const pollCompletionTick = useCanvasStore((s) => s.pollCompletionTick);
@@ -63,15 +69,22 @@ export function CanvasToolbar({
   async function onRun() {
     setRunning(true);
     try {
+      // Make sure any in-flight debounced param saves (e.g. user just changed
+      // a model dropdown) hit the DB before the backend reads node.params.
+      await flushPendingSaves();
       const res = await fetch(`/api/workflow/${workflowId}/run`, {
         method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sequential }),
       });
       if (!res.ok) {
         const text = await res.text();
         alert(`Run failed: ${text}`);
         return;
       }
-      startPolling();
+      // cascade=true → tick keeps firing downstream nodes as deps complete.
+      // sequential controls whether they fire one-at-a-time.
+      startPolling(true, sequential);
     } finally {
       setRunning(false);
     }
@@ -121,6 +134,23 @@ export function CanvasToolbar({
             polling…
           </span>
         )}
+        <button
+          type="button"
+          onClick={() => setSequential((v) => !v)}
+          title={
+            sequential
+              ? "Sequential — runs one node at a time, waits for each to finish (saves tokens)"
+              : "Parallel — fires all ready nodes at once (faster, more tokens)"
+          }
+          className="flex items-center gap-1 rounded-md border border-neutral-700 px-2 py-1.5 text-xs hover:bg-neutral-800"
+        >
+          {sequential ? (
+            <ListOrderedIcon className="h-3.5 w-3.5 text-emerald-400" />
+          ) : (
+            <ZapIcon className="h-3.5 w-3.5 text-amber-400" />
+          )}
+          {sequential ? "Sequential" : "Parallel"}
+        </button>
         <button
           onClick={onRun}
           disabled={running}

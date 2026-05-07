@@ -75,17 +75,37 @@ export type StoryboardScene = {
   duration?: number;
 };
 
+/** What kind of nodes to auto-create from the storyboard breakdown.
+ *  - `video`              → N Video nodes + 1 Scene Composer (current default)
+ *  - `image`              → N Image nodes only (still storyboard frames)
+ *  - `image-then-video`   → N Image → N Video → 1 Scene Composer
+ *                          (PRD's recommended flow — iterate cheaply on stills first) */
+export type StoryboardOutputMode = "video" | "image" | "image-then-video";
+
+/** How to wire image inputs across scenes.
+ *  - `parallel`   → reference (if any) goes to every Image; scenes are independent
+ *  - `sequential` → reference → Image 1 → Image 2 → … (each scene continues
+ *                   from previous; great for before/after, transformation, journey) */
+export type StoryboardChainMode = "parallel" | "sequential";
+
 export type StoryboardParams = {
   story: string;
   sceneCount: number;
   style?: string;
   totalDuration: number;
-  /** When true, "Generate Storyboard" auto-creates Video + Scene Composer.
-   *  When false, only the scene breakdown is produced; user adds nodes
-   *  manually via per-scene buttons. Defaults to true. */
+  /** When true, "Generate Storyboard" auto-creates the downstream nodes
+   *  according to `outputMode`. When false, only the scene breakdown is
+   *  produced. Defaults to true. */
   autoCreate?: boolean;
+  outputMode?: StoryboardOutputMode;
+  chainMode?: StoryboardChainMode;
   /** Result of last "Generate" — kept on the node so the user can iterate. */
   scenes?: StoryboardScene[];
+  /** Optional reference image (e.g. character photo) applied to every
+   *  auto-generated scene as image input — for consistency across scenes. */
+  referenceImageUrl?: string;
+  referenceImageMime?: string;
+  referenceImageFilename?: string;
 };
 
 export type SceneComposerParams = {
@@ -134,7 +154,7 @@ export const DEFAULT_PARAMS: Record<NodeType, Record<string, unknown>> = {
   image_generate: {
     prompt: "",
     model: DEFAULT_IMAGE_MODEL,
-    size: "1:1",
+    size: "9:16",
     resolution: "2K",
   } satisfies ImageGenerateParams,
   image_upload: {} satisfies ImageUploadParams,
@@ -144,6 +164,8 @@ export const DEFAULT_PARAMS: Record<NodeType, Record<string, unknown>> = {
     style: "cinematic",
     totalDuration: 15,
     autoCreate: true,
+    outputMode: "video",
+    chainMode: "parallel",
   } satisfies StoryboardParams,
   scene_composer: {
     transition: "cut",
@@ -151,9 +173,9 @@ export const DEFAULT_PARAMS: Record<NodeType, Record<string, unknown>> = {
   video_generate: {
     prompt: "",
     model: DEFAULT_VIDEO_MODEL,
-    aspectRatio: "16:9",
+    aspectRatio: "9:16",
     resolution: "720p",
-    duration: 5,
+    duration: 8, // VEO 3.1 Fast (default model) has fixed 8s duration
     audio: false,
   } satisfies VideoGenerateParams,
   export: {} satisfies ExportParams,

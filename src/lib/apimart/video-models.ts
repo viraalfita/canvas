@@ -342,7 +342,7 @@ export const VIDEO_MODELS: VideoModel[] = [
   },
 ];
 
-export const DEFAULT_VIDEO_MODEL: VideoModelId = "doubao-seedance-1-5-pro";
+export const DEFAULT_VIDEO_MODEL: VideoModelId = "veo3.1-fast";
 
 export function findVideoModel(id: string | undefined): VideoModel {
   return (

@@ -5,36 +5,8 @@
  * single-threaded `core` build (only the multi-threaded `core-mt` needs it).
  */
 
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile, toBlobURL } from "@ffmpeg/util";
-
-const CORE_VERSION = "0.12.10";
-const CORE_BASE = `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd`;
-
-let ffmpegSingleton: FFmpeg | null = null;
-let loadPromise: Promise<FFmpeg> | null = null;
-
-async function getFfmpeg(onLog?: (msg: string) => void): Promise<FFmpeg> {
-  if (ffmpegSingleton) return ffmpegSingleton;
-  if (loadPromise) return loadPromise;
-
-  loadPromise = (async () => {
-    const ff = new FFmpeg();
-    if (onLog) {
-      ff.on("log", ({ message }) => onLog(message));
-    }
-    await ff.load({
-      coreURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(
-        `${CORE_BASE}/ffmpeg-core.wasm`,
-        "application/wasm",
-      ),
-    });
-    ffmpegSingleton = ff;
-    return ff;
-  })();
-  return loadPromise;
-}
+import { fetchFile } from "@ffmpeg/util";
+import { getFfmpeg } from "./ffmpeg-singleton";
 
 /**
  * Concatenate the supplied MP4 URLs in order and return a Blob containing the

@@ -85,7 +85,8 @@ export function BranchVersionModal({
         const json = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(json.error ?? `Failed (${res.status})`);
       }
-      startPolling();
+      // Branch is a single regeneration — don't cascade downstream.
+      startPolling(false);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

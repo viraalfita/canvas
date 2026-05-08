@@ -421,7 +421,7 @@ function DualPromptField({
           onChange={(e) => onPromptChange(e.target.value)}
           rows={2}
           placeholder="describe in any language…"
-          className="mt-1 w-full resize-none rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
+          className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
         />
       </label>
       <label className="block">
@@ -433,7 +433,7 @@ function DualPromptField({
           onChange={(e) => onEnhancedChange(e.target.value)}
           rows={4}
           placeholder="click ✨ Enhance to fill, or leave empty to use plain prompt"
-          className="mt-1 w-full resize-none rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
+          className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
         />
       </label>
     </>

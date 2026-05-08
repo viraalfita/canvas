@@ -61,6 +61,18 @@ const nodeTypes = {
   export: ExportNode,
 };
 
+/** Thicken + color edges by source handle so the data-flow type is obvious
+ *  at a glance (image = emerald, video = purple). */
+function edgeStyleFor(handle: string | null | undefined) {
+  if (handle === "image_output") {
+    return { stroke: "#10b981", strokeWidth: 2.5 };
+  }
+  if (handle === "video_output") {
+    return { stroke: "#a855f7", strokeWidth: 2.5 };
+  }
+  return { stroke: "#737373", strokeWidth: 2 };
+}
+
 function rowToFlowEdge(row: CanvasEdgeRow) {
   return {
     id: row.id,
@@ -68,6 +80,8 @@ function rowToFlowEdge(row: CanvasEdgeRow) {
     sourceHandle: row.source_handle,
     target: row.target_node_id,
     targetHandle: row.target_handle,
+    style: edgeStyleFor(row.source_handle),
+    animated: true,
   };
 }
 
@@ -156,6 +170,42 @@ function CanvasEditorInner({
         if (c.type === "remove") {
           deleteNode(c.id).catch(console.error);
         }
+        // NodeResizer fires `dimensions` changes while resizing; persist only
+        // when the gesture finishes (`resizing === false`). We only save the
+        // WIDTH — height stays auto so the node grows with its content
+        // (preview image, history strip, etc.).
+        if (
+          c.type === "dimensions" &&
+          c.dimensions &&
+          c.resizing === false
+        ) {
+          const node = useCanvasStore
+            .getState()
+            .nodes.find((n) => n.id === c.id);
+          if (node) {
+            const params = (node.data as FlowNodeData).params;
+            commitNodeParams(c.id, {
+              ...params,
+              _uiWidth: Math.round(c.dimensions.width),
+            });
+            // applyNodeChanges set style.height during the drag; clear it so
+            // the node returns to auto-height once the gesture ends.
+            setNodes((curr) =>
+              curr.map((n) =>
+                n.id === c.id
+                  ? {
+                      ...n,
+                      style: {
+                        ...n.style,
+                        width: c.dimensions!.width,
+                        height: undefined,
+                      },
+                    }
+                  : n,
+              ),
+            );
+          }
+        }
       }
     },
     [setNodes],
@@ -191,7 +241,17 @@ function CanvasEditorInner({
           targetNodeId: connection.target,
           targetHandle: connection.targetHandle,
         });
-        setEdges((curr) => addEdge({ ...connection, id: row.id }, curr));
+        setEdges((curr) =>
+          addEdge(
+            {
+              ...connection,
+              id: row.id,
+              style: edgeStyleFor(connection.sourceHandle),
+              animated: true,
+            },
+            curr,
+          ),
+        );
       } catch (e) {
         console.error(e);
       }
@@ -235,7 +295,7 @@ function CanvasEditorInner({
           >
             <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
             <Controls />
-            <MiniMap pannable zoomable className="!bg-neutral-900" />
+            <MiniMap pannable zoomable className="bg-neutral-900!" />
           </ReactFlow>
         </div>
       </div>

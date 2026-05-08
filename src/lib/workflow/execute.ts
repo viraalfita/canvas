@@ -80,13 +80,30 @@ async function setNode(
 }
 
 /** Append a new entry to the node's output history. Called whenever a
- *  generation succeeds; failed runs are not recorded. */
+ *  generation succeeds; failed runs are not recorded.
+ *
+ *  Dedupes against the most recent row by URL — if two polling ticks race and
+ *  both see the same task as completed, we only insert one history row.
+ */
 async function recordHistory(
   ctx: WorkflowContext,
   nodeId: string,
   output: NodeOutput,
   usage: NodeUsage | null,
 ) {
+  const { data: latest } = await ctx.supabase
+    .from("node_outputs")
+    .select("output")
+    .eq("node_id", nodeId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const latestUrl = (latest?.output as NodeOutput | undefined)?.url;
+  if (latestUrl && latestUrl === output.url) {
+    // Same content as the most recent row — skip duplicate insert.
+    return;
+  }
+
   const { error } = await ctx.supabase.from("node_outputs").insert({
     node_id: nodeId,
     workflow_id: ctx.workflowId,
@@ -364,6 +381,23 @@ async function pollRunningNodes(ctx: WorkflowContext) {
           });
           continue;
         }
+        // Atomic claim — only one tick wins the right to process this
+        // completion. We clear `apimart_task_id` ONLY IF it still equals
+        // what we read at the start of this tick. If another tick already
+        // cleared it, this UPDATE matches 0 rows → we skip. This prevents
+        // the duplicate uploads + duplicate history rows that happened when
+        // overlapping ticks both saw the task as "completed".
+        const { data: claimed } = await ctx.supabase
+          .from("nodes")
+          .update({ apimart_task_id: null })
+          .eq("id", node.id)
+          .eq("apimart_task_id", node.apimart_task_id)
+          .select("id")
+          .maybeSingle();
+        if (!claimed) {
+          continue; // another tick already owns this completion
+        }
+
         const isVideo = !!res.data.result?.videos?.[0];
         const stored = await persistRemoteUrl({
           userId: ctx.userId,
@@ -403,8 +437,27 @@ async function pollRunningNodes(ctx: WorkflowContext) {
           status: "failed",
           error: res.data.error?.message ?? `Task ${status}`,
         });
+      } else {
+        // Still running — surface progress + ETA on the node so the UI can
+        // show a percentage bar instead of an opaque "running" state.
+        const prevUsage = (node.usage ?? {}) as NodeUsage;
+        const progress =
+          typeof res.data.progress === "number"
+            ? res.data.progress
+            : prevUsage.progress;
+        const estimatedTime =
+          typeof res.data.estimated_time === "number"
+            ? res.data.estimated_time
+            : prevUsage.estimatedTime;
+        if (
+          progress !== prevUsage.progress ||
+          estimatedTime !== prevUsage.estimatedTime
+        ) {
+          await setNode(ctx, node.id, {
+            usage: { ...prevUsage, progress, estimatedTime },
+          });
+        }
       }
-      // else: still running, leave as-is
     } catch (e) {
       await setNode(ctx, node.id, {
         status: "failed",

@@ -47,6 +47,11 @@ type Actions = {
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let pollCascade = true;
 let pollSequential = false;
+// Prevents overlapping ticks: when a tick takes longer than the interval
+// (which it does because of preprocess + storage upload + APImart polling),
+// the next setInterval fire could otherwise see a still-running task and
+// double-process it (causing duplicate history rows).
+let tickInflight = false;
 
 export const useCanvasStore = create<State & Actions>((set, get) => ({
   workflowId: null,
@@ -108,8 +113,13 @@ export const useCanvasStore = create<State & Actions>((set, get) => ({
     if (pollTimer) return;
     set({ isPolling: true });
     const tick = async () => {
+      if (tickInflight) return; // skip overlapping fires
+      tickInflight = true;
       const wfId = get().workflowId;
-      if (!wfId) return;
+      if (!wfId) {
+        tickInflight = false;
+        return;
+      }
       try {
         // Client-side preprocess: extract last frames from upstream Video
         // outputs into image inputs for downstream Video nodes. Done here
@@ -143,6 +153,8 @@ export const useCanvasStore = create<State & Actions>((set, get) => ({
         }
       } catch (e) {
         console.error("tick failed", e);
+      } finally {
+        tickInflight = false;
       }
     };
     void tick(); // run immediately
@@ -156,11 +168,36 @@ export const useCanvasStore = create<State & Actions>((set, get) => ({
   },
 }));
 
+/** Initial width when a node is first dropped on the canvas (before any user
+ *  resize). Stored on creation; honored by `rowToFlowNode` until the user
+ *  resizes and persists `_uiWidth`. */
+function defaultWidthFor(type: string): number {
+  switch (type) {
+    case "storyboard":
+      return 320;
+    case "video_generate":
+    case "scene_composer":
+      return 288;
+    default:
+      return 256;
+  }
+}
+
 export function rowToFlowNode(row: CanvasNodeRow): Node<FlowNodeData> {
+  const params = (row.params ?? {}) as Record<string, unknown>;
+  const uiWidth =
+    typeof params._uiWidth === "number" && params._uiWidth > 0
+      ? params._uiWidth
+      : defaultWidthFor(row.type);
+  // Height is intentionally NOT controlled here — we want each node to
+  // auto-grow to fit its content (image preview, history strip, etc.) so the
+  // user never has to scroll inside the body. Width is the only persisted
+  // dimension.
   return {
     id: row.id,
     type: row.type,
     position: { x: row.position_x, y: row.position_y },
+    style: { width: uiWidth },
     data: {
       nodeType: row.type,
       status: row.status,

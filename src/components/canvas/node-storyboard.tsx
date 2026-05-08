@@ -12,6 +12,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { NodeShell } from "./node-shell";
+import { NodeResizerShell } from "./node-resizer-shell";
 import { commitNodeParams } from "./canvas-editor";
 import {
   createImageFromScene,
@@ -34,7 +35,7 @@ import type {
 } from "@/lib/canvas/types";
 import type { Edge } from "@xyflow/react";
 
-export function StoryboardNode({ data }: NodeProps) {
+export function StoryboardNode({ data, selected }: NodeProps) {
   const id = useNodeId() ?? "";
   const d = data as FlowNodeData;
   const params = d.params as StoryboardParams;
@@ -229,12 +230,13 @@ export function StoryboardNode({ data }: NodeProps) {
   }
 
   return (
-    <NodeShell
-      title="Storyboard"
-      status={d.status}
-      error={d.error ?? error}
-      className="w-80"
-    >
+    <>
+      <NodeResizerShell selected={selected} minWidth={300} minHeight={300} />
+      <NodeShell
+        title="Storyboard"
+        status={d.status}
+        error={d.error ?? error}
+      >
       <label className="block">
         <span className="text-[10px] uppercase text-neutral-400">
           Story / Idea
@@ -244,7 +246,7 @@ export function StoryboardNode({ data }: NodeProps) {
           onChange={(e) => update("story", e.target.value)}
           placeholder="e.g. video 30 detik tentang anak muda mengejar mimpinya di kota besar, cinematic"
           rows={3}
-          className="mt-1 w-full resize-none rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
+          className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
         />
       </label>
       <div className="grid grid-cols-3 gap-2">
@@ -465,6 +467,7 @@ export function StoryboardNode({ data }: NodeProps) {
           )}
         </div>
       )}
-    </NodeShell>
+      </NodeShell>
+    </>
   );
 }

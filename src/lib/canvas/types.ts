@@ -28,6 +28,8 @@ export type NodeUsage = {
   actualTime?: number; // seconds reported by APImart
   estimatedTime?: number;
   completedAt?: number; // unix
+  /** 0-100, populated by polling tick while task is in-progress. */
+  progress?: number;
 };
 
 export type ImageGenerateParams = {

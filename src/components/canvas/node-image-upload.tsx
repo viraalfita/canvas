@@ -4,13 +4,16 @@ import { useRef, useState } from "react";
 import { Handle, Position, useNodeId, type NodeProps } from "@xyflow/react";
 import { UploadIcon, XIcon } from "lucide-react";
 import { NodeShell } from "./node-shell";
+import { MediaLightbox } from "./media-lightbox";
+import { NodeNameField } from "./node-name-field";
+import { NodeResizerShell } from "./node-resizer-shell";
 import type { FlowNodeData } from "@/lib/canvas/store";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { createClient } from "@/lib/supabase/client";
 import { setNodeOutput } from "@/lib/canvas/actions";
-import type { ImageUploadParams } from "@/lib/canvas/types";
+import type { ImageUploadParams, NodeOutput } from "@/lib/canvas/types";
 
-export function ImageUploadNode({ data }: NodeProps) {
+export function ImageUploadNode({ data, selected }: NodeProps) {
   const id = useNodeId() ?? "";
   const d = data as FlowNodeData;
   const params = d.params as ImageUploadParams;
@@ -20,6 +23,7 @@ export function ImageUploadNode({ data }: NodeProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<NodeOutput | null>(null);
 
   async function onFile(file: File) {
     if (!workflowId) return;
@@ -78,18 +82,21 @@ export function ImageUploadNode({ data }: NodeProps) {
 
   return (
     <>
+      <NodeResizerShell selected={selected} minWidth={220} minHeight={180} />
       <NodeShell
         title="Image Upload"
         status={d.status}
         error={d.error ?? localError}
       >
+        <NodeNameField nodeId={id} params={params} />
         {d.output?.kind === "image" ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={d.output.url}
               alt={params.filename ?? "upload"}
-              className="w-full rounded-md border border-neutral-800"
+              onClick={() => d.output && setZoom(d.output)}
+              className="w-full cursor-zoom-in rounded-md border border-neutral-800"
             />
             <div className="flex items-center justify-between text-[10px] text-neutral-500">
               <span className="truncate" title={params.filename}>
@@ -130,7 +137,12 @@ export function ImageUploadNode({ data }: NodeProps) {
         type="source"
         position={Position.Right}
         id="image_output"
-        className="!h-3 !w-3 !bg-emerald-500"
+        className="h-3! w-3! bg-emerald-500!"
+      />
+      <MediaLightbox
+        output={zoom}
+        caption={params.filename}
+        onClose={() => setZoom(null)}
       />
     </>
   );

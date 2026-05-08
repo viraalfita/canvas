@@ -6,20 +6,25 @@ import { NodeShell } from "./node-shell";
 import { UsageBadge } from "./usage-badge";
 import { RunNodeButton } from "./run-node-button";
 import { DownloadButton } from "./download-button";
+import { MediaLightbox } from "./media-lightbox";
+import { NodeResizerShell } from "./node-resizer-shell";
 import type { FlowNodeData } from "@/lib/canvas/store";
+import type { NodeOutput } from "@/lib/canvas/types";
 
-export function ExportNode({ data }: NodeProps) {
+export function ExportNode({ data, selected }: NodeProps) {
   const id = useNodeId() ?? "";
   const d = data as FlowNodeData;
   const [imgError, setImgError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<NodeOutput | null>(null);
 
   return (
     <>
+      <NodeResizerShell selected={selected} minWidth={220} minHeight={140} />
       <Handle
         type="target"
         position={Position.Left}
         id="input"
-        className="!h-3 !w-3 !bg-blue-500"
+        className="h-3! w-3! bg-blue-500!"
       />
       <NodeShell
         title="Export"
@@ -39,7 +44,8 @@ export function ExportNode({ data }: NodeProps) {
                   "Image failed to load. Check Supabase Storage policy for bucket 'outputs'.",
                 )
               }
-              className="w-full rounded-md border border-neutral-800"
+              onClick={() => d.output && setZoom(d.output)}
+              className="w-full cursor-zoom-in rounded-md border border-neutral-800"
             />
             <DownloadButton output={d.output} prefix="export" />
           </>
@@ -49,7 +55,8 @@ export function ExportNode({ data }: NodeProps) {
             <video
               src={d.output.url}
               controls
-              className="w-full rounded-md border border-neutral-800"
+              onClick={() => d.output && setZoom(d.output)}
+              className="w-full cursor-zoom-in rounded-md border border-neutral-800"
             />
             <DownloadButton output={d.output} prefix="export" />
           </>
@@ -61,6 +68,7 @@ export function ExportNode({ data }: NodeProps) {
         )}
         <UsageBadge usage={d.usage} />
       </NodeShell>
+      <MediaLightbox output={zoom} onClose={() => setZoom(null)} />
     </>
   );
 }

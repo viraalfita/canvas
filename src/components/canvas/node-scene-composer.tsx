@@ -10,7 +10,9 @@ import {
 } from "@xyflow/react";
 import { FilmIcon, Loader2Icon } from "lucide-react";
 import { NodeShell } from "./node-shell";
+import { NodeResizerShell } from "./node-resizer-shell";
 import { DownloadButton } from "./download-button";
+import { MediaLightbox } from "./media-lightbox";
 import { setNodeOutput } from "@/lib/canvas/actions";
 import { useCanvasStore, type FlowNodeData } from "@/lib/canvas/store";
 import { createClient } from "@/lib/supabase/client";
@@ -23,7 +25,7 @@ type UpstreamClip = {
   status: string;
 };
 
-export function SceneComposerNode({ data }: NodeProps) {
+export function SceneComposerNode({ data, selected }: NodeProps) {
   const id = useNodeId() ?? "";
   const d = data as FlowNodeData;
   const reactFlow = useReactFlow();
@@ -36,6 +38,7 @@ export function SceneComposerNode({ data }: NodeProps) {
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState<string>("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<NodeOutput | null>(null);
 
   // Walk upstream edges → ordered list of video clips. Order = the order
   // edges were added (Postgres returns by id which is gen_random_uuid, so
@@ -133,17 +136,17 @@ export function SceneComposerNode({ data }: NodeProps) {
 
   return (
     <>
+      <NodeResizerShell selected={selected} minWidth={260} minHeight={220} />
       <Handle
         type="target"
         position={Position.Left}
         id="video_input"
-        className="!h-3 !w-3 !bg-purple-500"
+        className="h-3! w-3! bg-purple-500!"
       />
       <NodeShell
         title="Scene Composer"
         status={d.status}
         error={d.error ?? localError}
-        className="w-72"
       >
         <p className="text-[10px] text-neutral-500">
           Connect 2+ video outputs to the purple input handle
@@ -192,17 +195,23 @@ export function SceneComposerNode({ data }: NodeProps) {
             <video
               src={d.output.url}
               controls
-              className="mt-1 w-full rounded-md border border-neutral-800"
+              onClick={() => d.output && setZoom(d.output)}
+              className="mt-1 w-full cursor-zoom-in rounded-md border border-neutral-800"
             />
             <DownloadButton output={d.output} prefix="composed-video" />
           </>
         )}
       </NodeShell>
+      <MediaLightbox
+        output={zoom}
+        caption="Composed video"
+        onClose={() => setZoom(null)}
+      />
       <Handle
         type="source"
         position={Position.Right}
         id="video_output"
-        className="!h-3 !w-3 !bg-purple-500"
+        className="h-3! w-3! bg-purple-500!"
       />
     </>
   );

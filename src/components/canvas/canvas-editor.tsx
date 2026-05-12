@@ -138,7 +138,7 @@ function CanvasEditorInner({
         "postgres_changes",
         {
           event: "UPDATE",
-          schema: "public",
+          schema: "canvas",
           table: "nodes",
           filter: `workflow_id=eq.${workflowId}`,
         },

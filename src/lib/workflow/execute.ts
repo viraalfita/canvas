@@ -17,7 +17,7 @@ import type {
 } from "@/lib/canvas/types";
 
 export type WorkflowContext = {
-  supabase: SupabaseClient;
+  supabase: SupabaseClient<any, "canvas", "canvas">;
   userId: string;
   workflowId: string;
 };

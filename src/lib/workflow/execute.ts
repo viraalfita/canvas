@@ -59,6 +59,10 @@ function readinessOf(
   for (const e of incoming) {
     const src = findNode(nodes, e.source_node_id);
     if (!src) return "blocked";
+    // text_prompt is a passive data-injection node — its content lives in
+    // `params.text`, not in `output`. Don't gate readiness on its status;
+    // it's always considered "available" regardless of idle/success.
+    if ((src.type as string) === "text_prompt") continue;
     if (src.status === "failed") return "blocked";
     if (src.status !== "success") waiting = true;
   }

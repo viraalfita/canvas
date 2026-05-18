@@ -102,9 +102,9 @@ export function BranchVersionModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100 shadow-2xl"
+        className="w-full max-w-md rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-2xl"
       >
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 px-4 py-3">
           <div className="flex items-center gap-2">
             <SparklesIcon className="h-4 w-4 text-emerald-400" />
             <h2 className="text-sm font-semibold">
@@ -113,27 +113,27 @@ export function BranchVersionModal({
           </div>
           <button
             onClick={onClose}
-            className="rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+            className="rounded p-1 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100"
             type="button"
           >
             <XIcon className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex gap-3 border-b border-neutral-800 p-4">
+        <div className="flex gap-3 border-b border-neutral-200 dark:border-neutral-800 p-4">
           {inputImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={inputImageUrl}
               alt="source"
-              className="h-20 w-20 rounded-md border border-neutral-700 object-cover"
+              className="h-20 w-20 rounded-md border border-neutral-300 dark:border-neutral-700 object-cover"
             />
           ) : (
-            <div className="flex h-20 w-20 items-center justify-center rounded-md border border-neutral-800 bg-neutral-950 text-[10px] text-neutral-500">
+            <div className="flex h-20 w-20 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 text-[10px] text-neutral-500">
               no input
             </div>
           )}
-          <div className="flex-1 text-xs text-neutral-400">
+          <div className="flex-1 text-xs text-neutral-600 dark:text-neutral-400">
             <div>
               {isVideo
                 ? "This version's thumbnail will be used as the first frame."
@@ -163,7 +163,7 @@ export function BranchVersionModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800"
+              className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
             >
               Cancel
             </button>
@@ -242,7 +242,7 @@ function ImageForm({
           <select
             value={p.size ?? model.aspectRatios[0]}
             onChange={(e) => setParams({ ...p, size: e.target.value })}
-            className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-xs outline-none focus:border-neutral-500"
+            className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1.5 text-xs outline-none focus:border-neutral-500"
           >
             {model.aspectRatios.map((r) => (
               <option key={r} value={r}>
@@ -256,7 +256,7 @@ function ImageForm({
             <select
               value={p.resolution ?? model.resolutions[0]}
               onChange={(e) => setParams({ ...p, resolution: e.target.value })}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-xs outline-none focus:border-neutral-500"
+              className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1.5 text-xs outline-none focus:border-neutral-500"
             >
               {model.resolutions.map((r) => (
                 <option key={r} value={r}>
@@ -326,7 +326,7 @@ function VideoForm({
             <select
               value={p.aspectRatio ?? model.aspectRatios[0]}
               onChange={(e) => setParams({ ...p, aspectRatio: e.target.value })}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-xs outline-none focus:border-neutral-500"
+              className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1.5 text-xs outline-none focus:border-neutral-500"
             >
               {model.aspectRatios.map((r) => (
                 <option key={r} value={r}>
@@ -341,7 +341,7 @@ function VideoForm({
             <select
               value={p.resolution ?? model.resolutions[0]}
               onChange={(e) => setParams({ ...p, resolution: e.target.value })}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-xs outline-none focus:border-neutral-500"
+              className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1.5 text-xs outline-none focus:border-neutral-500"
             >
               {model.resolutions.map((r) => (
                 <option key={r} value={r}>
@@ -357,7 +357,7 @@ function VideoForm({
             onChange={(e) =>
               setParams({ ...p, duration: parseInt(e.target.value, 10) })
             }
-            className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-xs outline-none focus:border-neutral-500"
+            className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1.5 text-xs outline-none focus:border-neutral-500"
           >
             {model.durations.map((dur) => (
               <option key={dur} value={dur}>
@@ -368,7 +368,7 @@ function VideoForm({
         </Field>
       </div>
       {model.supportsAudio && (
-        <label className="flex items-center gap-2 text-xs text-neutral-300">
+        <label className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
           <input
             type="checkbox"
             checked={p.audio ?? false}
@@ -384,7 +384,7 @@ function VideoForm({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-[10px] uppercase text-neutral-400">{label}</span>
+      <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">{label}</span>
       <div className="mt-1">{children}</div>
     </label>
   );
@@ -407,7 +407,7 @@ function DualPromptField({
     <>
       <label className="block">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase text-neutral-400">
+          <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
             Prompt (idea)
           </span>
           <EnhancePromptButton
@@ -421,11 +421,11 @@ function DualPromptField({
           onChange={(e) => onPromptChange(e.target.value)}
           rows={2}
           placeholder="describe in any language…"
-          className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
+          className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
         />
       </label>
       <label className="block">
-        <span className="text-[10px] uppercase text-neutral-400">
+        <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
           Enhanced prompt {enhancedPrompt ? "(used)" : "(optional)"}
         </span>
         <textarea
@@ -433,7 +433,7 @@ function DualPromptField({
           onChange={(e) => onEnhancedChange(e.target.value)}
           rows={4}
           placeholder="click ✨ Enhance to fill, or leave empty to use plain prompt"
-          className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
+          className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
         />
       </label>
     </>

@@ -42,7 +42,7 @@ export function NodeNameField({
           }
         }}
         placeholder="name this node…"
-        className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-[11px] text-neutral-100 outline-none focus:border-neutral-500"
+        className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-[11px] text-neutral-900 dark:text-neutral-100 outline-none focus:border-neutral-500"
       />
     );
   }
@@ -55,7 +55,7 @@ export function NodeNameField({
         setEditing(true);
       }}
       title="Click to rename — appears as Ref in downstream nodes"
-      className="flex w-full items-center gap-1 rounded-md border border-dashed border-neutral-800 px-2 py-1 text-[11px] text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
+      className="flex w-full items-center gap-1 rounded-md border border-dashed border-neutral-200 dark:border-neutral-800 px-2 py-1 text-[11px] text-neutral-600 dark:text-neutral-400 hover:border-neutral-400 dark:hover:border-neutral-600 hover:text-neutral-800 dark:hover:text-neutral-200"
     >
       <TagIcon className="h-3 w-3" />
       {initial || <span className="italic text-neutral-500">name this node…</span>}

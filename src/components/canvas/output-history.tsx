@@ -117,10 +117,10 @@ export function OutputHistory({
               <div
                 key={v.id}
                 className={cn(
-                  "relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border bg-neutral-950",
+                  "relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border bg-neutral-50 dark:bg-neutral-950",
                   isCurrent
                     ? "border-emerald-500"
-                    : "border-neutral-700 hover:border-neutral-500",
+                    : "border-neutral-300 dark:border-neutral-700 hover:border-neutral-500",
                   busyId === v.id && "opacity-50",
                 )}
                 title={`${shortAge(v.created_at)}${
@@ -158,7 +158,7 @@ export function OutputHistory({
                     onClick={(e) => onEdit(v, e)}
                     disabled={busyId === v.id}
                     title="Edit & regenerate from this version"
-                    className="rounded bg-black/70 p-1 text-neutral-200 backdrop-blur-sm hover:bg-emerald-600 hover:text-white"
+                    className="rounded bg-black/70 p-1 text-neutral-800 dark:text-neutral-200 backdrop-blur-sm hover:bg-emerald-600 hover:text-white"
                   >
                     <PencilIcon className="h-3 w-3" />
                   </button>
@@ -167,7 +167,7 @@ export function OutputHistory({
                     onClick={(e) => onDelete(v, e)}
                     disabled={busyId === v.id}
                     title="Delete this version"
-                    className="rounded bg-black/70 p-1 text-neutral-200 backdrop-blur-sm hover:bg-red-600 hover:text-white"
+                    className="rounded bg-black/70 p-1 text-neutral-800 dark:text-neutral-200 backdrop-blur-sm hover:bg-red-600 hover:text-white"
                   >
                     {busyId === v.id ? (
                       <Loader2Icon className="h-3 w-3 animate-spin" />

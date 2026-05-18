@@ -40,7 +40,7 @@ export function MediaLightbox({
       <button
         type="button"
         onClick={onClose}
-        className="absolute right-4 top-4 rounded-full bg-neutral-900/80 p-2 text-neutral-200 hover:bg-neutral-800"
+        className="absolute right-4 top-4 rounded-full bg-white/80 dark:bg-neutral-900/80 p-2 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800"
         title="Close (Esc)"
       >
         <XIcon className="h-5 w-5" />
@@ -65,7 +65,7 @@ export function MediaLightbox({
           />
         )}
         {caption && (
-          <div className="text-xs text-neutral-400" title={caption}>
+          <div className="text-xs text-neutral-600 dark:text-neutral-400" title={caption}>
             {caption}
           </div>
         )}

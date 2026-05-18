@@ -151,7 +151,7 @@ export function SceneComposerNode({ data, selected }: NodeProps) {
         <p className="text-[10px] text-neutral-500">
           Connect 2+ video outputs to the purple input handle
         </p>
-        <div className="rounded-md border border-neutral-800 bg-neutral-950/40 p-2 text-[10px] text-neutral-400">
+        <div className="rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-950/40 p-2 text-[10px] text-neutral-600 dark:text-neutral-400">
           <div className="flex items-center gap-1">
             <FilmIcon className="h-3 w-3" />
             <span>
@@ -183,7 +183,7 @@ export function SceneComposerNode({ data, selected }: NodeProps) {
           {busy ? stage || "composing…" : "Compose"}
         </button>
         {busy && progress > 0 && (
-          <div className="h-1 w-full overflow-hidden rounded bg-neutral-800">
+          <div className="h-1 w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800">
             <div
               className="h-full bg-emerald-500 transition-all"
               style={{ width: `${Math.round(progress * 100)}%` }}
@@ -196,7 +196,7 @@ export function SceneComposerNode({ data, selected }: NodeProps) {
               src={d.output.url}
               controls
               onClick={() => d.output && setZoom(d.output)}
-              className="mt-1 w-full cursor-zoom-in rounded-md border border-neutral-800"
+              className="mt-1 w-full cursor-zoom-in rounded-md border border-neutral-200 dark:border-neutral-800"
             />
             <DownloadButton output={d.output} prefix="composed-video" />
           </>

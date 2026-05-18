@@ -45,7 +45,7 @@ export function ExportNode({ data, selected }: NodeProps) {
                 )
               }
               onClick={() => d.output && setZoom(d.output)}
-              className="w-full cursor-zoom-in rounded-md border border-neutral-800"
+              className="w-full cursor-zoom-in rounded-md border border-neutral-200 dark:border-neutral-800"
             />
             <DownloadButton output={d.output} prefix="export" />
           </>
@@ -56,7 +56,7 @@ export function ExportNode({ data, selected }: NodeProps) {
               src={d.output.url}
               controls
               onClick={() => d.output && setZoom(d.output)}
-              className="w-full cursor-zoom-in rounded-md border border-neutral-800"
+              className="w-full cursor-zoom-in rounded-md border border-neutral-200 dark:border-neutral-800"
             />
             <DownloadButton output={d.output} prefix="export" />
           </>

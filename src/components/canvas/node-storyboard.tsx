@@ -238,7 +238,7 @@ export function StoryboardNode({ data, selected }: NodeProps) {
         error={d.error ?? error}
       >
       <label className="block">
-        <span className="text-[10px] uppercase text-neutral-400">
+        <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
           Story / Idea
         </span>
         <textarea
@@ -246,12 +246,12 @@ export function StoryboardNode({ data, selected }: NodeProps) {
           onChange={(e) => update("story", e.target.value)}
           placeholder="e.g. video 30 detik tentang anak muda mengejar mimpinya di kota besar, cinematic"
           rows={3}
-          className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
+          className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
         />
       </label>
       <div className="grid grid-cols-3 gap-2">
         <label className="block">
-          <span className="text-[10px] uppercase text-neutral-400">Scenes</span>
+          <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">Scenes</span>
           <input
             type="number"
             min={1}
@@ -260,11 +260,11 @@ export function StoryboardNode({ data, selected }: NodeProps) {
             onChange={(e) =>
               update("sceneCount", Math.max(1, Math.min(10, Number(e.target.value))))
             }
-            className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs outline-none"
+            className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
           />
         </label>
         <label className="block">
-          <span className="text-[10px] uppercase text-neutral-400">Total (s)</span>
+          <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">Total (s)</span>
           <input
             type="number"
             min={5}
@@ -273,28 +273,28 @@ export function StoryboardNode({ data, selected }: NodeProps) {
             onChange={(e) =>
               update("totalDuration", Math.max(5, Math.min(120, Number(e.target.value))))
             }
-            className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs outline-none"
+            className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
           />
         </label>
         <label className="block">
-          <span className="text-[10px] uppercase text-neutral-400">Style</span>
+          <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">Style</span>
           <input
             value={params.style ?? "cinematic"}
             onChange={(e) => update("style", e.target.value)}
             placeholder="cinematic"
-            className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs outline-none"
+            className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
           />
         </label>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="text-[10px] uppercase text-neutral-400">Output</span>
+          <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">Output</span>
           <select
             value={outputMode}
             onChange={(e) =>
               update("outputMode", e.target.value as StoryboardOutputMode)
             }
-            className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs outline-none"
+            className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
           >
             <option value="video">Video → Composer</option>
             <option value="image">Image only</option>
@@ -302,13 +302,13 @@ export function StoryboardNode({ data, selected }: NodeProps) {
           </select>
         </label>
         <label className="block">
-          <span className="text-[10px] uppercase text-neutral-400">Chain</span>
+          <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">Chain</span>
           <select
             value={chainMode}
             onChange={(e) =>
               update("chainMode", e.target.value as StoryboardChainMode)
             }
-            className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs outline-none"
+            className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
           >
             <option value="parallel">Parallel (independent)</option>
             <option value="sequential">Sequential (each → next)</option>
@@ -320,7 +320,7 @@ export function StoryboardNode({ data, selected }: NodeProps) {
           ? "Scene 1 → Scene 2 → Scene 3 — each continues from previous (great for before-after, transformation)."
           : "Scenes generate independently — share style only via reference image."}
       </p>
-      <label className="flex items-center gap-2 text-xs text-neutral-300">
+      <label className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
         <input
           type="checkbox"
           checked={autoCreate}
@@ -329,20 +329,20 @@ export function StoryboardNode({ data, selected }: NodeProps) {
         Auto-create scene nodes
       </label>
       <div className="space-y-1">
-        <span className="text-[10px] uppercase text-neutral-400">
+        <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
           Reference image (optional)
         </span>
         {refUrl ? (
-          <div className="flex items-start gap-2 rounded-md border border-neutral-700 bg-neutral-950/40 p-2">
+          <div className="flex items-start gap-2 rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50/40 dark:bg-neutral-950/40 p-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={refUrl}
               alt={params.referenceImageFilename ?? "reference"}
-              className="h-12 w-12 shrink-0 rounded-md border border-neutral-800 object-cover"
+              className="h-12 w-12 shrink-0 rounded-md border border-neutral-200 dark:border-neutral-800 object-cover"
             />
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <span
-                className="truncate text-[10px] text-neutral-400"
+                className="truncate text-[10px] text-neutral-600 dark:text-neutral-400"
                 title={params.referenceImageFilename}
               >
                 {params.referenceImageFilename ?? "uploaded"}
@@ -353,7 +353,7 @@ export function StoryboardNode({ data, selected }: NodeProps) {
               <button
                 type="button"
                 onClick={clearReferenceImage}
-                className="flex items-center gap-1 self-start text-[10px] text-neutral-400 hover:text-red-400"
+                className="flex items-center gap-1 self-start text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-red-400"
               >
                 <XIcon className="h-3 w-3" /> remove
               </button>
@@ -364,7 +364,7 @@ export function StoryboardNode({ data, selected }: NodeProps) {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadingRef}
-            className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-neutral-700 bg-neutral-950/40 py-3 text-[11px] text-neutral-400 hover:border-neutral-500 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-neutral-300 dark:border-neutral-700 bg-neutral-50/40 dark:bg-neutral-950/40 py-3 text-[11px] text-neutral-600 dark:text-neutral-400 hover:border-neutral-500 disabled:opacity-50"
           >
             {uploadingRef ? (
               <Loader2Icon className="h-3.5 w-3.5 animate-spin" />
@@ -406,14 +406,14 @@ export function StoryboardNode({ data, selected }: NodeProps) {
             {scenes.length} scenes
             {!autoCreate && " · pick which to add"}
           </div>
-          <ol className="max-h-48 space-y-1.5 overflow-y-auto rounded-md border border-neutral-800 bg-neutral-950/40 p-2 text-[10px]">
+          <ol className="max-h-48 space-y-1.5 overflow-y-auto rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-950/40 p-2 text-[10px]">
             {scenes.map((s) => {
               const imgKey = `${s.index}:image`;
               const vidKey = `${s.index}:video`;
               return (
                 <li key={s.index} className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-neutral-300">
+                    <div className="font-semibold text-neutral-700 dark:text-neutral-300">
                       Scene {s.index}
                       {typeof s.duration === "number"
                         ? ` · ${s.duration}s`
@@ -429,7 +429,7 @@ export function StoryboardNode({ data, selected }: NodeProps) {
                         onClick={() => addSceneNode(s, "image")}
                         disabled={addingScene === imgKey}
                         title="Add as Image node"
-                        className="rounded-md border border-neutral-700 p-1 text-neutral-300 hover:bg-emerald-600 hover:text-white disabled:opacity-50"
+                        className="rounded-md border border-neutral-300 dark:border-neutral-700 p-1 text-neutral-700 dark:text-neutral-300 hover:bg-emerald-600 hover:text-white disabled:opacity-50"
                       >
                         {addingScene === imgKey ? (
                           <Loader2Icon className="h-3 w-3 animate-spin" />
@@ -442,7 +442,7 @@ export function StoryboardNode({ data, selected }: NodeProps) {
                         onClick={() => addSceneNode(s, "video")}
                         disabled={addingScene === vidKey}
                         title="Add as Video node"
-                        className="rounded-md border border-neutral-700 p-1 text-neutral-300 hover:bg-purple-600 hover:text-white disabled:opacity-50"
+                        className="rounded-md border border-neutral-300 dark:border-neutral-700 p-1 text-neutral-700 dark:text-neutral-300 hover:bg-purple-600 hover:text-white disabled:opacity-50"
                       >
                         {addingScene === vidKey ? (
                           <Loader2Icon className="h-3 w-3 animate-spin" />

@@ -45,13 +45,13 @@ export function CanvasSidebar({
     "output",
   ];
   return (
-    <aside className="flex w-56 flex-col border-r border-neutral-800 bg-neutral-900">
-      <div className="border-b border-neutral-800 p-3 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+    <aside className="flex w-56 flex-col border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+      <div className="border-b border-neutral-200 dark:border-neutral-800 p-3 text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">
         Nodes
       </div>
       <div className="flex-1 overflow-y-auto">
         {groups.map((g) => (
-          <div key={g} className="border-b border-neutral-800/60 p-2 last:border-b-0">
+          <div key={g} className="border-b border-neutral-200/60 dark:border-neutral-800/60 p-2 last:border-b-0">
             <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-neutral-500">
               {GROUP_LABEL[g]}
             </div>
@@ -60,9 +60,9 @@ export function CanvasSidebar({
                 <li key={type}>
                   <button
                     onClick={() => onAddNode(type)}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-neutral-800"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   >
-                    <Icon className="h-4 w-4 text-neutral-400" />
+                    <Icon className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
                     <span>{label}</span>
                   </button>
                 </li>

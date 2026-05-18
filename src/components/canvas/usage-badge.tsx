@@ -9,7 +9,7 @@ export function UsageBadge({ usage }: { usage: NodeUsage | null }) {
   const modelLabel =
     IMAGE_MODELS.find((m) => m.id === usage.model)?.label ?? usage.model;
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border border-neutral-800 bg-neutral-950/60 px-2 py-1 text-[10px] text-neutral-400">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-950/60 px-2 py-1 text-[10px] text-neutral-600 dark:text-neutral-400">
       {modelLabel && (
         <span className="flex items-center gap-1">
           <SparklesIcon className="h-3 w-3" />

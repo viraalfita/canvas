@@ -713,20 +713,82 @@ export async function deleteNode(id: string) {
 }
 
 /**
- * Bulk-clone several nodes at once, preserving edges that connect *between*
- * the selected set. Used by the Cmd+D / Ctrl+D shortcut after a lasso
- * selection — lets the user stamp a whole sub-graph (e.g. text_prompt +
- * 3 scenes wired together) as a unit.
- *
- * Edges where one endpoint is outside the selection are dropped — the copy
- * is a self-contained island; user rewires inputs from the outer graph
- * manually if needed.
+ * Recreate previously-deleted nodes and edges. The new nodes get fresh ids,
+ * so edges referencing the deleted node ids are remapped via the idMap. Used
+ * by Cmd+Z to undo a delete operation. Output, status and usage are restored
+ * verbatim from the snapshot.
+ */
+export async function restoreNodes(input: {
+  nodes: CanvasNodeRow[];
+  edges: CanvasEdgeRow[];
+}): Promise<{ nodes: CanvasNodeRow[]; edges: CanvasEdgeRow[] }> {
+  const { supabase } = await authed();
+  if (input.nodes.length === 0) return { nodes: [], edges: [] };
+
+  const idMap = new Map<string, string>();
+  const newNodes: CanvasNodeRow[] = [];
+  for (const n of input.nodes) {
+    const { data: copy, error } = await supabase
+      .from("nodes")
+      .insert({
+        workflow_id: n.workflow_id,
+        type: n.type,
+        position_x: n.position_x,
+        position_y: n.position_y,
+        params: n.params,
+        output: n.output,
+        // Tasks that were mid-flight can't be re-claimed after delete.
+        status:
+          n.status === "running" || n.status === "queued" ? "idle" : n.status,
+        error: n.error,
+        usage: n.usage,
+      })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    idMap.set(n.id, copy.id as string);
+    newNodes.push(copy as CanvasNodeRow);
+  }
+
+  let newEdges: CanvasEdgeRow[] = [];
+  if (input.edges.length > 0) {
+    const remapped = input.edges
+      .map((e) => {
+        const s = idMap.get(e.source_node_id);
+        const t = idMap.get(e.target_node_id);
+        if (!s || !t) return null;
+        return {
+          workflow_id: e.workflow_id,
+          source_node_id: s,
+          source_handle: e.source_handle,
+          target_node_id: t,
+          target_handle: e.target_handle,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+    if (remapped.length > 0) {
+      const { data: inserted, error } = await supabase
+        .from("edges")
+        .insert(remapped)
+        .select();
+      if (error) throw new Error(error.message);
+      newEdges = (inserted ?? []) as CanvasEdgeRow[];
+    }
+  }
+
+  return { nodes: newNodes, edges: newEdges };
+}
+
+/**
+ * Bulk-clone several nodes at once. Edges are NOT copied — the duplicated
+ * nodes land as standalone islands and the user rewires connections manually.
+ * Output and version history ARE preserved (fork semantics).
  */
 export async function duplicateNodes(
   ids: string[],
-): Promise<{ nodes: CanvasNodeRow[]; edges: CanvasEdgeRow[] }> {
+): Promise<{ nodes: CanvasNodeRow[] }> {
   const { supabase } = await authed();
-  if (ids.length === 0) return { nodes: [], edges: [] };
+  if (ids.length === 0) return { nodes: [] };
 
   const { data: srcNodes, error: srcErr } = await supabase
     .from("nodes")
@@ -734,10 +796,10 @@ export async function duplicateNodes(
     .in("id", ids);
   if (srcErr) throw new Error(srcErr.message);
   const sourceNodes = (srcNodes ?? []) as CanvasNodeRow[];
-  if (sourceNodes.length === 0) return { nodes: [], edges: [] };
+  if (sourceNodes.length === 0) return { nodes: [] };
 
   // Insert clones one-by-one so we can capture each new id and map it to
-  // the original — needed for edge & history rewrites.
+  // the original — needed for the history rewrite.
   const idMap = new Map<string, string>();
   const newNodes: CanvasNodeRow[] = [];
   for (const n of sourceNodes) {
@@ -761,41 +823,6 @@ export async function duplicateNodes(
     if (error) throw new Error(error.message);
     idMap.set(n.id, copy.id as string);
     newNodes.push(copy as CanvasNodeRow);
-  }
-
-  // Edges where BOTH endpoints are in the selection — chained `.in()` calls
-  // AND together in Supabase.
-  const { data: edges } = await supabase
-    .from("edges")
-    .select("*")
-    .in("source_node_id", ids)
-    .in("target_node_id", ids);
-  const sourceEdges = (edges ?? []) as CanvasEdgeRow[];
-
-  let newEdges: CanvasEdgeRow[] = [];
-  if (sourceEdges.length > 0) {
-    const remapped = sourceEdges
-      .map((e) => {
-        const s = idMap.get(e.source_node_id);
-        const t = idMap.get(e.target_node_id);
-        if (!s || !t) return null;
-        return {
-          workflow_id: e.workflow_id,
-          source_node_id: s,
-          source_handle: e.source_handle,
-          target_node_id: t,
-          target_handle: e.target_handle,
-        };
-      })
-      .filter((r): r is NonNullable<typeof r> => r !== null);
-    if (remapped.length > 0) {
-      const { data: inserted, error } = await supabase
-        .from("edges")
-        .insert(remapped)
-        .select();
-      if (error) throw new Error(error.message);
-      newEdges = (inserted ?? []) as CanvasEdgeRow[];
-    }
   }
 
   // Mirror history per node (parallel — independent writes).
@@ -825,7 +852,7 @@ export async function duplicateNodes(
     }),
   );
 
-  return { nodes: newNodes, edges: newEdges };
+  return { nodes: newNodes };
 }
 
 /**
@@ -922,6 +949,31 @@ export async function deleteEdge(id: string) {
   const { supabase } = await authed();
   const { error } = await supabase.from("edges").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+/** Re-create an edge from a snapshot. Used by Cmd+Z to undo edge deletion.
+ *  The new edge gets a fresh id (foreign keys to the original are gone). */
+export async function restoreEdge(snapshot: {
+  workflowId: string;
+  sourceNodeId: string;
+  sourceHandle: string;
+  targetNodeId: string;
+  targetHandle: string;
+}): Promise<CanvasEdgeRow> {
+  const { supabase } = await authed();
+  const { data, error } = await supabase
+    .from("edges")
+    .insert({
+      workflow_id: snapshot.workflowId,
+      source_node_id: snapshot.sourceNodeId,
+      source_handle: snapshot.sourceHandle,
+      target_node_id: snapshot.targetNodeId,
+      target_handle: snapshot.targetHandle,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data as CanvasEdgeRow;
 }
 
 // ============================================================

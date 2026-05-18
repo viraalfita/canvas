@@ -10,6 +10,7 @@ import {
   renameWorkflow,
   type WorkflowSummary,
 } from "@/lib/canvas/actions";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { WorkflowCard } from "./workflow-card";
 
 export function WorkflowsPage({
@@ -67,22 +68,25 @@ export function WorkflowsPage({
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100">
-      <header className="border-b border-neutral-800 bg-neutral-900">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100">
+      <header className="border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
             <LayoutGridIcon className="h-5 w-5 text-emerald-400" />
             <h1 className="text-lg font-semibold">Canvas</h1>
           </div>
-          <form action="/api/auth/signout" method="post">
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <form action="/api/auth/signout" method="post">
             <button
               type="submit"
-              className="flex items-center gap-1 rounded-md border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800"
+              className="flex items-center gap-1 rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
             >
               <LogOutIcon className="h-4 w-4" />
               Sign out
             </button>
           </form>
+          </div>
         </div>
       </header>
 
@@ -90,7 +94,7 @@ export function WorkflowsPage({
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">Workflows</h2>
-            <p className="text-sm text-neutral-400">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
               {workflows.length} {workflows.length === 1 ? "workflow" : "workflows"}
             </p>
           </div>
@@ -105,7 +109,7 @@ export function WorkflowsPage({
         </div>
 
         {workflows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-800 bg-neutral-900/40 py-20 text-center">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800 bg-white/40 dark:bg-neutral-900/40 py-20 text-center">
             <LayoutGridIcon className="mb-3 h-10 w-10 text-neutral-700" />
             <h3 className="text-base font-medium">No workflows yet</h3>
             <p className="mt-1 text-sm text-neutral-500">

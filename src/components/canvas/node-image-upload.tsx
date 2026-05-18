@@ -96,7 +96,7 @@ export function ImageUploadNode({ data, selected }: NodeProps) {
               src={d.output.url}
               alt={params.filename ?? "upload"}
               onClick={() => d.output && setZoom(d.output)}
-              className="w-full cursor-zoom-in rounded-md border border-neutral-800"
+              className="w-full cursor-zoom-in rounded-md border border-neutral-200 dark:border-neutral-800"
             />
             <div className="flex items-center justify-between text-[10px] text-neutral-500">
               <span className="truncate" title={params.filename}>
@@ -104,7 +104,7 @@ export function ImageUploadNode({ data, selected }: NodeProps) {
               </span>
               <button
                 onClick={clearUpload}
-                className="flex items-center gap-1 text-neutral-400 hover:text-neutral-200"
+                className="flex items-center gap-1 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
               >
                 <XIcon className="h-3 w-3" />
                 clear
@@ -115,7 +115,7 @@ export function ImageUploadNode({ data, selected }: NodeProps) {
           <button
             onClick={() => inputRef.current?.click()}
             disabled={busy}
-            className="flex w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-neutral-700 bg-neutral-950/40 py-6 text-xs text-neutral-400 hover:border-neutral-500 disabled:opacity-50"
+            className="flex w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-neutral-300 dark:border-neutral-700 bg-neutral-50/40 dark:bg-neutral-950/40 py-6 text-xs text-neutral-600 dark:text-neutral-400 hover:border-neutral-500 disabled:opacity-50"
           >
             <UploadIcon className="h-4 w-4" />
             {busy ? "uploading…" : "Click to upload image"}

@@ -41,6 +41,7 @@ export function StatusBadge({
 function DuplicateNodeButton() {
   const id = useNodeId();
   const setNodes = useCanvasStore((s) => s.setNodes);
+  const pushUndo = useCanvasStore((s) => s.pushUndo);
   const [busy, setBusy] = useState(false);
   if (!id) return null;
   return (
@@ -57,13 +58,14 @@ function DuplicateNodeButton() {
           await flushPendingSaves();
           const row = await duplicateNode(id);
           setNodes((curr) => [...curr, rowToFlowNode(row)]);
+          pushUndo({ kind: "duplicate_nodes", createdNodeIds: [row.id] });
         } catch (err) {
           alert(err instanceof Error ? err.message : String(err));
         } finally {
           setBusy(false);
         }
       }}
-      className="rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100 disabled:opacity-40"
+      className="rounded p-1 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-40"
     >
       <CopyIcon className="h-3.5 w-3.5" />
     </button>
@@ -109,11 +111,11 @@ export function NodeShell({
         // Width comes from React Flow's wrapper (set via node.style). Height is
         // auto so the node grows to fit content as it generates output, history,
         // etc. — user never has to scroll inside the node body.
-        "flex w-full flex-col rounded-lg border border-neutral-700 bg-neutral-900 text-neutral-100 shadow-md",
+        "flex w-full flex-col rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-md",
         className,
       )}
     >
-      <div className="flex shrink-0 items-center justify-between rounded-t-lg border-b border-neutral-800 bg-neutral-900 px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between rounded-t-lg border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <div className="truncate text-xs font-semibold">{title}</div>
           {status === "running" && typeof estimatedTime === "number" && (
@@ -132,7 +134,7 @@ export function NodeShell({
         </div>
       </div>
       {showProgressBar && (
-        <div className="h-1 shrink-0 bg-neutral-800">
+        <div className="h-1 shrink-0 bg-neutral-100 dark:bg-neutral-800">
           <div
             className="h-full bg-blue-500 transition-all duration-500 ease-out"
             style={{ width: `${pct}%` }}

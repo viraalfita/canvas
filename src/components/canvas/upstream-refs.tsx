@@ -46,7 +46,7 @@ export function UpstreamRefs({ nodeId }: { nodeId: string }) {
       {refs.map((r) => (
         <span
           key={r.id}
-          className="rounded-md border border-neutral-700 bg-neutral-950/40 px-1.5 py-0.5 text-[10px] text-neutral-300"
+          className="rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50/40 dark:bg-neutral-950/40 px-1.5 py-0.5 text-[10px] text-neutral-700 dark:text-neutral-300"
           title={r.label}
         >
           {r.label.length > 22 ? r.label.slice(0, 22) + "…" : r.label}

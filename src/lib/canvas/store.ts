@@ -2,7 +2,13 @@
 
 import { create } from "zustand";
 import type { Edge, Node } from "@xyflow/react";
-import type { CanvasNodeRow, NodeOutput, NodeStatus, NodeUsage } from "./types";
+import type {
+  CanvasEdgeRow,
+  CanvasNodeRow,
+  NodeOutput,
+  NodeStatus,
+  NodeUsage,
+} from "./types";
 
 export type FlowNodeData = {
   nodeType: CanvasNodeRow["type"];
@@ -13,6 +19,15 @@ export type FlowNodeData = {
   usage: NodeUsage | null;
 };
 
+/** Discrete operation that Cmd+Z can reverse. Append-only; oldest entries
+ *  drop off when the stack exceeds UNDO_LIMIT. */
+export type UndoEntry =
+  | { kind: "duplicate_nodes"; createdNodeIds: string[] }
+  | { kind: "delete_nodes"; nodes: CanvasNodeRow[]; edges: CanvasEdgeRow[] }
+  | { kind: "delete_edge"; edge: CanvasEdgeRow };
+
+const UNDO_LIMIT = 10;
+
 type State = {
   workflowId: string | null;
   nodes: Node<FlowNodeData>[];
@@ -20,6 +35,7 @@ type State = {
   isPolling: boolean;
   /** Bumped every time polling completes a workflow (for refreshing balance, etc). */
   pollCompletionTick: number;
+  undoStack: UndoEntry[];
 };
 
 type Actions = {
@@ -40,6 +56,8 @@ type Actions = {
    *  node is dispatched at a time — the next waits for the previous to finish. */
   startPolling: (cascade?: boolean, sequential?: boolean) => void;
   stopPolling: () => void;
+  pushUndo: (entry: UndoEntry) => void;
+  popUndo: () => UndoEntry | undefined;
 };
 
 // Module-level state for the polling loop. Survives re-renders without
@@ -59,6 +77,7 @@ export const useCanvasStore = create<State & Actions>((set, get) => ({
   edges: [],
   isPolling: false,
   pollCompletionTick: 0,
+  undoStack: [],
 
   setWorkflowId: (id) => set({ workflowId: id }),
 
@@ -165,6 +184,22 @@ export const useCanvasStore = create<State & Actions>((set, get) => ({
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = null;
     set({ isPolling: false });
+  },
+
+  pushUndo: (entry) =>
+    set((s) => {
+      const next = [...s.undoStack, entry];
+      // Cap stack — drop oldest when over UNDO_LIMIT.
+      if (next.length > UNDO_LIMIT) next.splice(0, next.length - UNDO_LIMIT);
+      return { undoStack: next };
+    }),
+
+  popUndo: () => {
+    const stack = get().undoStack;
+    if (stack.length === 0) return undefined;
+    const entry = stack[stack.length - 1];
+    set({ undoStack: stack.slice(0, -1) });
+    return entry;
   },
 }));
 

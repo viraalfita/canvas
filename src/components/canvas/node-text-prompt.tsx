@@ -25,7 +25,7 @@ export function TextPromptNode({ data, selected }: NodeProps) {
       <NodeShell title="Text Prompt" status={d.status} error={d.error}>
         <NodeNameField nodeId={id} params={params} />
         <label className="block">
-          <span className="text-[10px] uppercase text-neutral-400">
+          <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
             Shared prompt (prepended to connected scenes)
           </span>
           <textarea
@@ -35,7 +35,7 @@ export function TextPromptNode({ data, selected }: NodeProps) {
             }
             placeholder="e.g. cinematic, 4k, soft natural lighting, shot on 35mm…"
             rows={5}
-            className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[80px] max-h-[400px] rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
+            className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[80px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
           />
         </label>
         <p className="text-[10px] text-neutral-500">

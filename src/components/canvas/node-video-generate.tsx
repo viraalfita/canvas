@@ -79,11 +79,11 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
           {model.maxImages})
         </p>
         <label className="block">
-          <span className="text-[10px] uppercase text-neutral-400">Model</span>
+          <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">Model</span>
           <select
             value={currentModelId}
             onChange={(e) => onModelChange(e.target.value as VideoModelId)}
-            className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs outline-none"
+            className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
           >
             {VIDEO_MODELS.map((m) => (
               <option key={m.id} value={m.id}>
@@ -95,7 +95,7 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
         </label>
         <label className="block">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase text-neutral-400">
+            <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
               Prompt (idea)
             </span>
             <EnhancePromptButton
@@ -113,11 +113,11 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
             }
             placeholder="describe in any language — e.g. transisi pagi ke malam cinematic"
             rows={2}
-            className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
+            className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
           />
         </label>
         <label className="block">
-          <span className="text-[10px] uppercase text-neutral-400">
+          <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
             Enhanced prompt {params.enhancedPrompt ? "(used)" : "(optional)"}
           </span>
           <textarea
@@ -127,13 +127,13 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
             }
             placeholder="click ✨ Enhance to generate detailed English prompt here"
             rows={4}
-            className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-700 bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
+            className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
           />
         </label>
         <div className="grid grid-cols-3 gap-2">
           {model.aspectRatios && (
             <label className="block">
-              <span className="text-[10px] uppercase text-neutral-400">
+              <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
                 Aspect
               </span>
               <select
@@ -141,7 +141,7 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
                 onChange={(e) =>
                   commitNodeParams(id, { ...params, aspectRatio: e.target.value })
                 }
-                className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs outline-none"
+                className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
               >
                 {model.aspectRatios.map((r) => (
                   <option key={r} value={r}>
@@ -153,13 +153,13 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
           )}
           {model.resolutions && (
             <label className="block">
-              <span className="text-[10px] uppercase text-neutral-400">Res</span>
+              <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">Res</span>
               <select
                 value={params.resolution ?? model.resolutions[0]}
                 onChange={(e) =>
                   commitNodeParams(id, { ...params, resolution: e.target.value })
                 }
-                className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs outline-none"
+                className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
               >
                 {model.resolutions.map((r) => (
                   <option key={r} value={r}>
@@ -170,7 +170,7 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
             </label>
           )}
           <label className="block">
-            <span className="text-[10px] uppercase text-neutral-400">Dur</span>
+            <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">Dur</span>
             <select
               value={params.duration ?? model.defaultDuration}
               onChange={(e) =>
@@ -179,7 +179,7 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
                   duration: parseInt(e.target.value, 10),
                 })
               }
-              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs outline-none"
+              className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
             >
               {model.durations.map((dur) => (
                 <option key={dur} value={dur}>
@@ -190,7 +190,7 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
           </label>
         </div>
         {model.supportsAudio && (
-          <label className="flex items-center gap-2 text-xs text-neutral-300">
+          <label className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
             <input
               type="checkbox"
               checked={params.audio ?? false}
@@ -211,7 +211,7 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
               }
               onLoadedData={() => setVidError(null)}
               onClick={() => d.output && setZoom(d.output)}
-              className="mt-1 w-full cursor-zoom-in rounded-md border border-neutral-800"
+              className="mt-1 w-full cursor-zoom-in rounded-md border border-neutral-200 dark:border-neutral-800"
             />
             <DownloadButton output={d.output} prefix="video-generate" />
           </>

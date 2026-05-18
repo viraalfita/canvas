@@ -11,9 +11,13 @@ import {
   Trash2Icon,
   ListOrderedIcon,
   ZapIcon,
+  PanelLeftIcon,
+  LayoutPanelTopIcon,
 } from "lucide-react";
 import { BalanceIndicator } from "./balance-indicator";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { useNavMode } from "@/lib/canvas/use-nav-mode";
 import { deleteWorkflow, renameWorkflow } from "@/lib/canvas/actions";
 import { flushPendingSaves } from "./canvas-editor";
 
@@ -32,6 +36,7 @@ export function CanvasToolbar({
   const isPolling = useCanvasStore((s) => s.isPolling);
   const startPolling = useCanvasStore((s) => s.startPolling);
   const pollCompletionTick = useCanvasStore((s) => s.pollCompletionTick);
+  const { mode: navMode, toggle: toggleNavMode } = useNavMode();
 
   // Inline-editable workflow name
   const [editing, setEditing] = useState(false);
@@ -91,12 +96,12 @@ export function CanvasToolbar({
   }
 
   return (
-    <div className="flex items-center justify-between border-b border-neutral-800 bg-neutral-900 px-4 py-2">
+    <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-4 py-2">
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <Link
           href="/"
           title="Back to workflows"
-          className="rounded p-1.5 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+          className="rounded p-1.5 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100"
         >
           <ArrowLeftIcon className="h-4 w-4" />
         </Link>
@@ -113,14 +118,14 @@ export function CanvasToolbar({
                 setDraftName(workflowName);
               }
             }}
-            className="min-w-0 flex-1 max-w-xs rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-sm outline-none focus:border-neutral-500"
+            className="min-w-0 flex-1 max-w-xs rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-sm outline-none focus:border-neutral-500"
           />
         ) : (
           <button
             type="button"
             onClick={() => setEditing(true)}
             title="Click to rename"
-            className="truncate rounded px-1 py-0.5 text-sm font-medium hover:bg-neutral-800"
+            className="truncate rounded px-1 py-0.5 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800"
           >
             {workflowName}
           </button>
@@ -129,7 +134,7 @@ export function CanvasToolbar({
       <div className="flex items-center gap-2">
         <BalanceIndicator refreshKey={pollCompletionTick} />
         {isPolling && (
-          <span className="flex items-center gap-1 text-xs text-neutral-400">
+          <span className="flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400">
             <Loader2Icon className="h-3 w-3 animate-spin" />
             polling…
           </span>
@@ -142,7 +147,7 @@ export function CanvasToolbar({
               ? "Sequential — runs one node at a time, waits for each to finish (saves tokens)"
               : "Parallel — fires all ready nodes at once (faster, more tokens)"
           }
-          className="flex items-center gap-1 rounded-md border border-neutral-700 px-2 py-1.5 text-xs hover:bg-neutral-800"
+          className="flex items-center gap-1 rounded-md border border-neutral-300 dark:border-neutral-700 px-2 py-1.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
         >
           {sequential ? (
             <ListOrderedIcon className="h-3.5 w-3.5 text-emerald-400" />
@@ -162,14 +167,31 @@ export function CanvasToolbar({
         <button
           onClick={onDelete}
           title="Delete this workflow"
-          className="flex items-center gap-1 rounded-md border border-neutral-700 px-2 py-1.5 text-sm text-red-400 hover:bg-neutral-800"
+          className="flex items-center gap-1 rounded-md border border-neutral-300 dark:border-neutral-700 px-2 py-1.5 text-sm text-red-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
         >
           <Trash2Icon className="h-4 w-4" />
         </button>
+        <button
+          type="button"
+          onClick={toggleNavMode}
+          title={
+            navMode === "dock"
+              ? "Switch to left sidebar layout"
+              : "Switch to floating dock layout"
+          }
+          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+        >
+          {navMode === "dock" ? (
+            <PanelLeftIcon className="h-4 w-4" />
+          ) : (
+            <LayoutPanelTopIcon className="h-4 w-4" />
+          )}
+        </button>
+        <ThemeToggle />
         <form action="/api/auth/signout" method="post">
           <button
             type="submit"
-            className="flex items-center gap-1 rounded-md border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800"
+            className="flex items-center gap-1 rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
           >
             <LogOutIcon className="h-4 w-4" />
             Sign out

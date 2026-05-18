@@ -21,7 +21,7 @@ export function NodeResizerShell({
       minWidth={minWidth}
       minHeight={minHeight}
       lineClassName="border-emerald-500/60!"
-      handleClassName="h-2! w-2! rounded-sm! border-emerald-500! bg-neutral-900!"
+      handleClassName="h-2! w-2! rounded-sm! border-emerald-500! bg-white dark:bg-neutral-900!"
     />
   );
 }

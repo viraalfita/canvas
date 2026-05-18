@@ -66,7 +66,7 @@ export function BalanceIndicator({ refreshKey }: { refreshKey?: number }) {
     <button
       onClick={manualRefresh}
       title="Refresh APImart balance"
-      className="flex items-center gap-1 rounded-md border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800"
+      className="flex items-center gap-1 rounded-md border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
     >
       <WalletIcon className="h-3 w-3" />
       {balance.unlimited ? (

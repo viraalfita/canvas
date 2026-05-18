@@ -57,9 +57,9 @@ export function WorkflowCard({
   }
 
   return (
-    <div className="group relative rounded-xl border border-neutral-800 bg-neutral-900 transition hover:border-neutral-700">
+    <div className="group relative rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 transition hover:border-neutral-300 dark:hover:border-neutral-700">
       <Link href={`/canvas/${workflow.id}`} className="block">
-        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-xl bg-neutral-950">
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-xl bg-neutral-50 dark:bg-neutral-950">
           {workflow.thumbnail_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -91,7 +91,7 @@ export function WorkflowCard({
                 }
               }}
               disabled={saving}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-sm outline-none focus:border-neutral-500"
+              className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-sm outline-none focus:border-neutral-500"
             />
           ) : (
             <Link href={`/canvas/${workflow.id}`} className="block">
@@ -111,8 +111,8 @@ export function WorkflowCard({
             type="button"
             onClick={() => setMenuOpen((s) => !s)}
             className={cn(
-              "rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100",
-              menuOpen && "bg-neutral-800 text-neutral-100",
+              "rounded p-1 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100",
+              menuOpen && "bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100",
             )}
             aria-label="Workflow actions"
           >
@@ -124,14 +124,14 @@ export function WorkflowCard({
                 className="fixed inset-0 z-10"
                 onClick={() => setMenuOpen(false)}
               />
-              <div className="absolute right-0 top-7 z-20 w-36 overflow-hidden rounded-md border border-neutral-700 bg-neutral-900 shadow-lg">
+              <div className="absolute right-0 top-7 z-20 w-36 overflow-hidden rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg">
                 <button
                   type="button"
                   onClick={() => {
                     setEditing(true);
                     setMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-800"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                 >
                   <PencilIcon className="h-3.5 w-3.5" />
                   Rename
@@ -142,7 +142,7 @@ export function WorkflowCard({
                     onDuplicate();
                     setMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-800"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                 >
                   <CopyIcon className="h-3.5 w-3.5" />
                   Duplicate
@@ -153,7 +153,7 @@ export function WorkflowCard({
                     onDelete();
                     setMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-neutral-800"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                 >
                   <Trash2Icon className="h-3.5 w-3.5" />
                   Delete

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useTheme } from "next-themes";
 import {
   Background,
   BackgroundVariant,
@@ -12,6 +13,7 @@ import {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
+  useStore as useReactFlowStore,
   type Connection,
   type Node,
   type OnConnect,
@@ -27,6 +29,8 @@ import {
   deleteEdge,
   deleteNode,
   duplicateNodes,
+  restoreEdge,
+  restoreNodes,
   updateNodeParams,
   updateNodePosition,
 } from "@/lib/canvas/actions";
@@ -47,8 +51,10 @@ import { StoryboardNode } from "./node-storyboard";
 import { SceneComposerNode } from "./node-scene-composer";
 import { ExportNode } from "./node-export";
 import { TextPromptNode } from "./node-text-prompt";
+import { CanvasDock } from "./canvas-dock";
 import { CanvasSidebar } from "./canvas-sidebar";
 import { CanvasToolbar } from "./canvas-toolbar";
+import { useNavMode } from "@/lib/canvas/use-nav-mode";
 
 // `image_edit` / `image_merge` are legacy types kept here as aliases so older
 // rows render correctly even before the SQL migration runs. Run
@@ -120,6 +126,76 @@ function CanvasEditorInner({
   const patchNodeData = useCanvasStore((s) => s.patchNodeData);
   const setWorkflowId = useCanvasStore((s) => s.setWorkflowId);
   const stopPolling = useCanvasStore((s) => s.stopPolling);
+  const pushUndo = useCanvasStore((s) => s.pushUndo);
+
+  // When the user deletes a node, React Flow also emits `remove` changes for
+  // every edge that touched it. We snapshot those edges as part of the
+  // node-delete undo entry, so we need to tell onEdgesChange to NOT push a
+  // separate edge-delete entry for the same ids — otherwise Cmd+Z would
+  // need two presses to fully undo one delete.
+  const cascadeRemovedEdgeIds = useRef<Set<string>>(new Set());
+
+  // Auto-pan during lasso selection. Modelled exactly on xyflow's own
+  // autoPanOnNodeDrag implementation (see @xyflow/system index.js around
+  // line 2152) so the math + panBy signs match what's known to work.
+  //
+  // Trigger is the internal store flag `userSelectionActive`, which xyflow
+  // flips on as soon as the lasso rect grows past the click threshold.
+  // Subscribing via useStore guarantees we re-run the effect each time.
+  const panBy = useReactFlowStore((s) => s.panBy);
+  const userSelectionActive = useReactFlowStore((s) => s.userSelectionActive);
+  const mouseRef = useRef<{ x: number; y: number }>({ x: -1, y: -1 });
+
+  // Global pointermove listener — fresh cursor coords ready the instant the
+  // lasso flips on.
+  useEffect(() => {
+    function onPointerMove(e: PointerEvent) {
+      mouseRef.current.x = e.clientX;
+      mouseRef.current.y = e.clientY;
+    }
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onPointerMove);
+  }, []);
+
+  useEffect(() => {
+    if (!userSelectionActive) return;
+    const EDGE = 80; // distance from edge that triggers panning
+    const SPEED = 20; // max px per frame at the edge
+    let raf: number | null = null;
+
+    function clamp(v: number, lo: number, hi: number) {
+      return Math.min(Math.max(v, lo), hi);
+    }
+
+    // Sign convention copied from xyflow's calcAutoPanVelocity: positive
+    // when cursor is near the TOP or LEFT (we want the camera to move that
+    // way, revealing more "before" content), negative near BOTTOM/RIGHT.
+    function velocity(value: number, min: number, max: number): number {
+      if (value < min) {
+        return clamp(Math.abs(value - min), 1, min) / min;
+      }
+      if (value > max) {
+        return -clamp(Math.abs(value - max), 1, min) / min;
+      }
+      return 0;
+    }
+
+    function tick() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const { x: mx, y: my } = mouseRef.current;
+      const vx = velocity(mx, EDGE, w - EDGE) * SPEED;
+      const vy = velocity(my, EDGE, h - EDGE) * SPEED;
+      if (vx !== 0 || vy !== 0) {
+        panBy({ x: vx, y: vy });
+      }
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => {
+      if (raf !== null) cancelAnimationFrame(raf);
+    };
+  }, [userSelectionActive, panBy]);
 
   // Hydrate Zustand store (an external system) from server-fetched initial data once.
   useEffect(() => {
@@ -164,6 +240,56 @@ function CanvasEditorInner({
 
   const onNodesChange: OnNodesChange<Node<FlowNodeData>> = useCallback(
     (changes) => {
+      // Snapshot doomed nodes + their edges BEFORE applyNodeChanges removes
+      // them from the store — needed for Cmd+Z undo.
+      const removeIds = new Set(
+        changes.filter((c) => c.type === "remove").map((c) => c.id),
+      );
+      if (removeIds.size > 0) {
+        const state = useCanvasStore.getState();
+        const snapshotNodes: CanvasNodeRow[] = state.nodes
+          .filter((n) => removeIds.has(n.id))
+          .map((n) => {
+            const d = n.data as FlowNodeData;
+            return {
+              id: n.id,
+              workflow_id: workflowId,
+              type: d.nodeType,
+              position_x: n.position.x,
+              position_y: n.position.y,
+              params: d.params,
+              output: d.output,
+              status: d.status,
+              apimart_task_id: null,
+              error: d.error,
+              usage: d.usage,
+            };
+          });
+        const snapshotEdges: CanvasEdgeRow[] = state.edges
+          .filter(
+            (e) =>
+              (e.source && removeIds.has(e.source)) ||
+              (e.target && removeIds.has(e.target)),
+          )
+          .map((e) => ({
+            id: e.id,
+            workflow_id: workflowId,
+            source_node_id: e.source ?? "",
+            source_handle: e.sourceHandle ?? "",
+            target_node_id: e.target ?? "",
+            target_handle: e.targetHandle ?? "",
+          }));
+        if (snapshotNodes.length > 0) {
+          pushUndo({
+            kind: "delete_nodes",
+            nodes: snapshotNodes,
+            edges: snapshotEdges,
+          });
+          // Mark cascaded edges so onEdgesChange skips its own undo push.
+          for (const e of snapshotEdges) cascadeRemovedEdgeIds.current.add(e.id);
+        }
+      }
+
       setNodes((curr) => applyNodeChanges<Node<FlowNodeData>>(changes, curr));
       for (const c of changes) {
         if (c.type === "position" && c.position && c.dragging === false) {
@@ -212,11 +338,36 @@ function CanvasEditorInner({
         }
       }
     },
-    [setNodes],
+    [setNodes, workflowId, pushUndo],
   );
 
   const onEdgesChange: OnEdgesChange = useCallback(
     (changes) => {
+      // Snapshot edges being removed (skip cascaded ones — already covered
+      // by the parent node-delete undo entry).
+      for (const c of changes) {
+        if (c.type !== "remove") continue;
+        if (cascadeRemovedEdgeIds.current.has(c.id)) {
+          cascadeRemovedEdgeIds.current.delete(c.id);
+          continue;
+        }
+        const edge = useCanvasStore
+          .getState()
+          .edges.find((e) => e.id === c.id);
+        if (edge && edge.source && edge.target) {
+          pushUndo({
+            kind: "delete_edge",
+            edge: {
+              id: edge.id,
+              workflow_id: workflowId,
+              source_node_id: edge.source,
+              source_handle: edge.sourceHandle ?? "",
+              target_node_id: edge.target,
+              target_handle: edge.targetHandle ?? "",
+            },
+          });
+        }
+      }
       setEdges((curr) => applyEdgeChanges(changes, curr));
       for (const c of changes) {
         if (c.type === "remove") {
@@ -224,7 +375,7 @@ function CanvasEditorInner({
         }
       }
     },
-    [setEdges],
+    [setEdges, workflowId, pushUndo],
   );
 
   const onConnect: OnConnect = useCallback(
@@ -302,8 +453,7 @@ function CanvasEditorInner({
       try {
         // Make sure debounced param edits land before cloning.
         await flushPendingSaves();
-        const { nodes: newRows, edges: newEdgeRows } =
-          await duplicateNodes(selectedIds);
+        const { nodes: newRows } = await duplicateNodes(selectedIds);
         if (newRows.length === 0) return;
 
         // Deselect originals, mark clones as the new selection — Figma-like.
@@ -314,8 +464,83 @@ function CanvasEditorInner({
             selected: true,
           })),
         ]);
-        if (newEdgeRows.length > 0) {
-          setEdges((curr) => [...curr, ...newEdgeRows.map(rowToFlowEdge)]);
+
+        // Push to undo stack so Cmd+Z removes them.
+        pushUndo({
+          kind: "duplicate_nodes",
+          createdNodeIds: newRows.map((r) => r.id),
+        });
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err));
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [setNodes, setEdges, pushUndo]);
+
+  // Cmd+A / Ctrl+A: select every node on the canvas. Skipped while focus is
+  // in a text field so the OS-native "select all text" still works.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const isSelectAll =
+        (e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "a";
+      if (!isSelectAll) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      e.preventDefault();
+      setNodes((curr) =>
+        curr.every((n) => n.selected)
+          ? curr
+          : curr.map((n) => (n.selected ? n : { ...n, selected: true })),
+      );
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [setNodes]);
+
+  // Cmd+Z / Ctrl+Z: pop the most recent undo entry and reverse it. Handles
+  // (a) undoing a duplicate by deleting the clones, (b) restoring deleted
+  // nodes + their edges, (c) restoring a single deleted edge.
+  useEffect(() => {
+    async function onKeyDown(e: KeyboardEvent) {
+      const isUndo =
+        (e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "z";
+      if (!isUndo) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      e.preventDefault();
+
+      const entry = useCanvasStore.getState().popUndo();
+      if (!entry) return;
+
+      try {
+        if (entry.kind === "duplicate_nodes") {
+          const ids = new Set(entry.createdNodeIds);
+          await Promise.all(
+            entry.createdNodeIds.map((id) =>
+              deleteNode(id).catch(console.error),
+            ),
+          );
+          setNodes((curr) => curr.filter((n) => !ids.has(n.id)));
+        } else if (entry.kind === "delete_nodes") {
+          const { nodes: restoredNodes, edges: restoredEdges } =
+            await restoreNodes({
+              nodes: entry.nodes,
+              edges: entry.edges,
+            });
+          setNodes((curr) => [...curr, ...restoredNodes.map(rowToFlowNode)]);
+          if (restoredEdges.length > 0) {
+            setEdges((curr) => [...curr, ...restoredEdges.map(rowToFlowEdge)]);
+          }
+        } else if (entry.kind === "delete_edge") {
+          const restored = await restoreEdge({
+            workflowId: entry.edge.workflow_id,
+            sourceNodeId: entry.edge.source_node_id,
+            sourceHandle: entry.edge.source_handle,
+            targetNodeId: entry.edge.target_node_id,
+            targetHandle: entry.edge.target_handle,
+          });
+          setEdges((curr) => [...curr, rowToFlowEdge(restored)]);
         }
       } catch (err) {
         alert(err instanceof Error ? err.message : String(err));
@@ -326,13 +551,17 @@ function CanvasEditorInner({
   }, [setNodes, setEdges]);
 
   const stableNodeTypes = useMemo(() => nodeTypes, []);
+  const { resolvedTheme } = useTheme();
+  const colorMode: "light" | "dark" =
+    resolvedTheme === "dark" ? "dark" : "light";
+  const { mode: navMode } = useNavMode();
 
   return (
-    <div className="flex h-screen w-screen bg-neutral-950 text-neutral-100">
-      <CanvasSidebar onAddNode={onAddNode} />
+    <div className="flex h-screen w-screen bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+      {navMode === "sidebar" && <CanvasSidebar onAddNode={onAddNode} />}
       <div className="flex flex-1 flex-col">
         <CanvasToolbar workflowId={workflowId} workflowName={workflowName} />
-        <div className="flex-1">
+        <div className="relative flex-1">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -340,7 +569,7 @@ function CanvasEditorInner({
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             nodeTypes={stableNodeTypes}
-            colorMode="dark"
+            colorMode={colorMode}
             fitView
             // Figma-style multi-select: drag empty area = lasso, middle /
             // right click = pan, scroll wheel = pan, Cmd/Ctrl + scroll =
@@ -353,8 +582,9 @@ function CanvasEditorInner({
           >
             <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
             <Controls />
-            <MiniMap pannable zoomable className="bg-neutral-900!" />
+            <MiniMap pannable zoomable />
           </ReactFlow>
+          {navMode === "dock" && <CanvasDock onAddNode={onAddNode} />}
         </div>
       </div>
     </div>

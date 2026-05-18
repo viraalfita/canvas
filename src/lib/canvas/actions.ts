@@ -713,6 +713,122 @@ export async function deleteNode(id: string) {
 }
 
 /**
+ * Bulk-clone several nodes at once, preserving edges that connect *between*
+ * the selected set. Used by the Cmd+D / Ctrl+D shortcut after a lasso
+ * selection — lets the user stamp a whole sub-graph (e.g. text_prompt +
+ * 3 scenes wired together) as a unit.
+ *
+ * Edges where one endpoint is outside the selection are dropped — the copy
+ * is a self-contained island; user rewires inputs from the outer graph
+ * manually if needed.
+ */
+export async function duplicateNodes(
+  ids: string[],
+): Promise<{ nodes: CanvasNodeRow[]; edges: CanvasEdgeRow[] }> {
+  const { supabase } = await authed();
+  if (ids.length === 0) return { nodes: [], edges: [] };
+
+  const { data: srcNodes, error: srcErr } = await supabase
+    .from("nodes")
+    .select("*")
+    .in("id", ids);
+  if (srcErr) throw new Error(srcErr.message);
+  const sourceNodes = (srcNodes ?? []) as CanvasNodeRow[];
+  if (sourceNodes.length === 0) return { nodes: [], edges: [] };
+
+  // Insert clones one-by-one so we can capture each new id and map it to
+  // the original — needed for edge & history rewrites.
+  const idMap = new Map<string, string>();
+  const newNodes: CanvasNodeRow[] = [];
+  for (const n of sourceNodes) {
+    const { data: copy, error } = await supabase
+      .from("nodes")
+      .insert({
+        workflow_id: n.workflow_id,
+        type: n.type,
+        position_x: n.position_x + 40,
+        position_y: n.position_y + 40,
+        params: n.params,
+        output: n.output,
+        // Don't claim an in-flight task on the original — clone starts idle.
+        status:
+          n.status === "running" || n.status === "queued" ? "idle" : n.status,
+        error: n.error,
+        usage: n.usage,
+      })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    idMap.set(n.id, copy.id as string);
+    newNodes.push(copy as CanvasNodeRow);
+  }
+
+  // Edges where BOTH endpoints are in the selection — chained `.in()` calls
+  // AND together in Supabase.
+  const { data: edges } = await supabase
+    .from("edges")
+    .select("*")
+    .in("source_node_id", ids)
+    .in("target_node_id", ids);
+  const sourceEdges = (edges ?? []) as CanvasEdgeRow[];
+
+  let newEdges: CanvasEdgeRow[] = [];
+  if (sourceEdges.length > 0) {
+    const remapped = sourceEdges
+      .map((e) => {
+        const s = idMap.get(e.source_node_id);
+        const t = idMap.get(e.target_node_id);
+        if (!s || !t) return null;
+        return {
+          workflow_id: e.workflow_id,
+          source_node_id: s,
+          source_handle: e.source_handle,
+          target_node_id: t,
+          target_handle: e.target_handle,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+    if (remapped.length > 0) {
+      const { data: inserted, error } = await supabase
+        .from("edges")
+        .insert(remapped)
+        .select();
+      if (error) throw new Error(error.message);
+      newEdges = (inserted ?? []) as CanvasEdgeRow[];
+    }
+  }
+
+  // Mirror history per node (parallel — independent writes).
+  await Promise.all(
+    sourceNodes.map(async (src) => {
+      const newId = idMap.get(src.id);
+      if (!newId) return;
+      const { data: history } = await supabase
+        .from("node_outputs")
+        .select("output, usage, created_at")
+        .eq("node_id", src.id);
+      const histRows = (history ?? []) as Array<{
+        output: NodeOutput;
+        usage: NodeUsage | null;
+        created_at: string;
+      }>;
+      if (histRows.length === 0) return;
+      const remapped = histRows.map((h) => ({
+        node_id: newId,
+        workflow_id: src.workflow_id,
+        output: h.output,
+        usage: h.usage,
+        created_at: h.created_at,
+      }));
+      const { error } = await supabase.from("node_outputs").insert(remapped);
+      if (error) throw new Error(error.message);
+    }),
+  );
+
+  return { nodes: newNodes, edges: newEdges };
+}
+
+/**
  * Fork-clone a single node: same type/params/output/history with a small
  * positional offset so it's visible next to the original. Edges are NOT
  * copied — caller can rewire as needed. Returns the new row so the client

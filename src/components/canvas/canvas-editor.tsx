@@ -8,6 +8,7 @@ import {
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  SelectionMode,
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
@@ -25,6 +26,7 @@ import {
   createNode,
   deleteEdge,
   deleteNode,
+  duplicateNodes,
   updateNodeParams,
   updateNodePosition,
 } from "@/lib/canvas/actions";
@@ -277,6 +279,52 @@ function CanvasEditorInner({
     [workflowId, setNodes],
   );
 
+  // Cmd+D / Ctrl+D: duplicate every currently-selected node, preserving any
+  // edges that connect within the selection. Skipped while the user is
+  // typing inside a node's input/textarea so the shortcut doesn't fight
+  // text editing.
+  useEffect(() => {
+    async function onKeyDown(e: KeyboardEvent) {
+      const isDup =
+        (e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "d";
+      if (!isDup) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      // Prevent browser "bookmark this page" dialog.
+      e.preventDefault();
+
+      const selectedIds = useCanvasStore
+        .getState()
+        .nodes.filter((n) => n.selected)
+        .map((n) => n.id);
+      if (selectedIds.length === 0) return;
+
+      try {
+        // Make sure debounced param edits land before cloning.
+        await flushPendingSaves();
+        const { nodes: newRows, edges: newEdgeRows } =
+          await duplicateNodes(selectedIds);
+        if (newRows.length === 0) return;
+
+        // Deselect originals, mark clones as the new selection — Figma-like.
+        setNodes((curr) => [
+          ...curr.map((n) => (n.selected ? { ...n, selected: false } : n)),
+          ...newRows.map((row) => ({
+            ...rowToFlowNode(row),
+            selected: true,
+          })),
+        ]);
+        if (newEdgeRows.length > 0) {
+          setEdges((curr) => [...curr, ...newEdgeRows.map(rowToFlowEdge)]);
+        }
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err));
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [setNodes, setEdges]);
+
   const stableNodeTypes = useMemo(() => nodeTypes, []);
 
   return (
@@ -294,6 +342,14 @@ function CanvasEditorInner({
             nodeTypes={stableNodeTypes}
             colorMode="dark"
             fitView
+            // Figma-style multi-select: drag empty area = lasso, middle /
+            // right click = pan, scroll wheel = pan, Cmd/Ctrl + scroll =
+            // zoom. Hold Cmd/Ctrl to add individual nodes to the selection.
+            selectionOnDrag
+            panOnDrag={[1, 2]}
+            panOnScroll
+            selectionMode={SelectionMode.Partial}
+            multiSelectionKeyCode={["Meta", "Control"]}
           >
             <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
             <Controls />

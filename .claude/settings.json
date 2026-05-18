@@ -7,7 +7,9 @@
       "Bash(pnpm exec *)",
       "Bash(pnpm lint *)",
       "Bash(NEXT_PUBLIC_SUPABASE_URL=https://x.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy SUPABASE_SERVICE_ROLE_KEY=dummy APIMART_API_KEY=dummy INTERNAL_LLM_API_KEY=dummy pnpm build)",
-      "Bash(perl -pi -e 's/!h-3 !w-3 !bg-\\(\\\\w+\\)-\\(\\\\d+\\)/h-3! w-3! bg-$1-$2!/g' node-scene-composer.tsx node-image-upload.tsx node-image-generate.tsx node-video-generate.tsx node-export.tsx)"
+      "Bash(perl -pi -e 's/!h-3 !w-3 !bg-\\(\\\\w+\\)-\\(\\\\d+\\)/h-3! w-3! bg-$1-$2!/g' node-scene-composer.tsx node-image-upload.tsx node-image-generate.tsx node-video-generate.tsx node-export.tsx)",
+      "WebFetch(domain:developers.heygen.com)",
+      "WebFetch(domain:docs.heygen.com)"
     ]
   }
 }

@@ -10,6 +10,7 @@ import {
   type NodeOutputHistoryRow,
   type NodeStatus,
   type NodeType,
+  type NodeUsage,
   type StoryboardChainMode,
   type StoryboardOutputMode,
   type StoryboardScene,
@@ -139,6 +140,125 @@ export async function deleteWorkflow(id: string) {
   const { supabase } = await authed();
   const { error } = await supabase.from("workflows").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Deep-clone a workflow: new workflow row + all nodes + all edges + the entire
+ * node_outputs history. Output URLs are reused (Supabase Storage files stay
+ * shared between the original and the copy — same public bucket, same paths).
+ *
+ * Returns the new workflow id so the caller can navigate to it.
+ */
+export async function duplicateWorkflow(id: string): Promise<string> {
+  const { supabase, user } = await authed();
+
+  const { data: src, error: wErr } = await supabase
+    .from("workflows")
+    .select("name")
+    .eq("id", id)
+    .maybeSingle();
+  if (wErr) throw new Error(wErr.message);
+  if (!src) throw new Error("Workflow not found");
+
+  const { data: newWf, error: insErr } = await supabase
+    .from("workflows")
+    .insert({ user_id: user.id, name: `Copy of ${src.name as string}` })
+    .select("id")
+    .single();
+  if (insErr) throw new Error(insErr.message);
+  const newWfId = newWf.id as string;
+
+  const { data: nodes } = await supabase
+    .from("nodes")
+    .select("*")
+    .eq("workflow_id", id);
+  const nodeRows = (nodes ?? []) as CanvasNodeRow[];
+
+  // Insert nodes one-by-one so we capture each new id and build the mapping
+  // for edge & history rewrites. (A single bulk insert with .select() also
+  // works but Postgres doesn't guarantee row order — safer to map by hand.)
+  const idMap = new Map<string, string>();
+  for (const n of nodeRows) {
+    const { data: copy, error } = await supabase
+      .from("nodes")
+      .insert({
+        workflow_id: newWfId,
+        type: n.type,
+        position_x: n.position_x,
+        position_y: n.position_y,
+        params: n.params,
+        output: n.output,
+        // Skip task ownership — only the original node should poll an
+        // in-flight APImart task. The copy starts idle if the source was
+        // mid-flight, otherwise mirrors success/failed.
+        status:
+          n.status === "running" || n.status === "queued" ? "idle" : n.status,
+        error: n.error,
+        usage: n.usage,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    idMap.set(n.id, copy.id as string);
+  }
+
+  const { data: edges } = await supabase
+    .from("edges")
+    .select("*")
+    .eq("workflow_id", id);
+  const edgeRows = (edges ?? []) as CanvasEdgeRow[];
+  if (edgeRows.length > 0) {
+    const remapped = edgeRows
+      .map((e) => {
+        const s = idMap.get(e.source_node_id);
+        const t = idMap.get(e.target_node_id);
+        if (!s || !t) return null;
+        return {
+          workflow_id: newWfId,
+          source_node_id: s,
+          source_handle: e.source_handle,
+          target_node_id: t,
+          target_handle: e.target_handle,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+    if (remapped.length > 0) {
+      const { error } = await supabase.from("edges").insert(remapped);
+      if (error) throw new Error(error.message);
+    }
+  }
+
+  const { data: history } = await supabase
+    .from("node_outputs")
+    .select("node_id, output, usage, created_at")
+    .eq("workflow_id", id);
+  const histRows = (history ?? []) as Array<{
+    node_id: string;
+    output: NodeOutput;
+    usage: NodeUsage | null;
+    created_at: string;
+  }>;
+  if (histRows.length > 0) {
+    const remapped = histRows
+      .map((h) => {
+        const nid = idMap.get(h.node_id);
+        if (!nid) return null;
+        return {
+          node_id: nid,
+          workflow_id: newWfId,
+          output: h.output,
+          usage: h.usage,
+          created_at: h.created_at,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+    if (remapped.length > 0) {
+      const { error } = await supabase.from("node_outputs").insert(remapped);
+      if (error) throw new Error(error.message);
+    }
+  }
+
+  return newWfId;
 }
 
 // ============================================================
@@ -483,6 +603,11 @@ export async function createNode(input: {
   position: { x: number; y: number };
 }) {
   const { supabase } = await authed();
+  // text_prompt nodes have no async work — they're treated as immediately
+  // "ready" so downstream readiness checks (which require status='success')
+  // pass without the user having to "run" them.
+  const initialStatus: NodeStatus =
+    input.type === "text_prompt" ? "success" : "idle";
   const { data, error } = await supabase
     .from("nodes")
     .insert({
@@ -491,6 +616,7 @@ export async function createNode(input: {
       position_x: input.position.x,
       position_y: input.position.y,
       params: DEFAULT_PARAMS[input.type],
+      status: initialStatus,
     })
     .select()
     .single();
@@ -584,6 +710,73 @@ export async function deleteNode(id: string) {
   const { supabase } = await authed();
   const { error } = await supabase.from("nodes").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Fork-clone a single node: same type/params/output/history with a small
+ * positional offset so it's visible next to the original. Edges are NOT
+ * copied — caller can rewire as needed. Returns the new row so the client
+ * can append to its store immediately.
+ */
+export async function duplicateNode(id: string): Promise<CanvasNodeRow> {
+  const { supabase } = await authed();
+
+  const { data: src, error: srcErr } = await supabase
+    .from("nodes")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (srcErr) throw new Error(srcErr.message);
+  if (!src) throw new Error("Node not found");
+  const source = src as CanvasNodeRow;
+
+  const { data: copy, error: insErr } = await supabase
+    .from("nodes")
+    .insert({
+      workflow_id: source.workflow_id,
+      type: source.type,
+      position_x: source.position_x + 40,
+      position_y: source.position_y + 40,
+      params: source.params,
+      output: source.output,
+      // Don't claim the original's in-flight task — only the source node
+      // should consume that completion. Reset to idle so the user can rerun
+      // independently.
+      status:
+        source.status === "running" || source.status === "queued"
+          ? "idle"
+          : source.status,
+      error: source.error,
+      usage: source.usage,
+    })
+    .select()
+    .single();
+  if (insErr) throw new Error(insErr.message);
+  const newNode = copy as CanvasNodeRow;
+
+  // Mirror history so the copy carries the same version timeline.
+  const { data: history } = await supabase
+    .from("node_outputs")
+    .select("output, usage, created_at")
+    .eq("node_id", id);
+  const histRows = (history ?? []) as Array<{
+    output: NodeOutput;
+    usage: NodeUsage | null;
+    created_at: string;
+  }>;
+  if (histRows.length > 0) {
+    const remapped = histRows.map((h) => ({
+      node_id: newNode.id,
+      workflow_id: newNode.workflow_id,
+      output: h.output,
+      usage: h.usage,
+      created_at: h.created_at,
+    }));
+    const { error } = await supabase.from("node_outputs").insert(remapped);
+    if (error) throw new Error(error.message);
+  }
+
+  return newNode;
 }
 
 export async function createEdge(input: {

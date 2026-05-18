@@ -55,6 +55,13 @@ export function ImageGenerateNode({ data, selected }: NodeProps) {
         id="image_input"
         className="h-3! w-3! bg-blue-500!"
       />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="text_input"
+        style={{ top: 64 }}
+        className="h-3! w-3! bg-amber-400!"
+      />
       <NodeShell
         title="Image"
         status={d.status}

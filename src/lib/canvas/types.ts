@@ -10,7 +10,8 @@ export type NodeType =
   | "video_generate"
   | "storyboard"
   | "scene_composer"
-  | "export";
+  | "export"
+  | "text_prompt";
 
 export type NodeStatus =
   | "idle"
@@ -68,6 +69,14 @@ export type VideoGenerateParams = {
 
 export type ExportParams = {
   filename?: string;
+};
+
+export type TextPromptParams = {
+  /** Reusable prompt text. Connected downstream Image/Video nodes will get
+   *  this prepended to their own prompt at run time, so a "general style"
+   *  prompt can be authored once and reused across many scenes. */
+  text: string;
+  displayName?: string;
 };
 
 export type StoryboardScene = {
@@ -181,4 +190,7 @@ export const DEFAULT_PARAMS: Record<NodeType, Record<string, unknown>> = {
     audio: false,
   } satisfies VideoGenerateParams,
   export: {} satisfies ExportParams,
+  text_prompt: {
+    text: "",
+  } satisfies TextPromptParams,
 };

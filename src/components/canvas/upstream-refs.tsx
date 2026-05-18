@@ -22,11 +22,14 @@ export function UpstreamRefs({ nodeId }: { nodeId: string }) {
       const displayName = (params.displayName as string | undefined)?.trim();
       const filename = (params.filename as string | undefined)?.trim();
       const promptStr = (params.prompt as string | undefined) ?? "";
+      const textStr = (params.text as string | undefined) ?? "";
       const fallback =
         data.nodeType === "image_upload"
           ? filename || "uploaded"
-          : promptStr.slice(0, 24) ||
-            data.nodeType.replace(/_/g, " ");
+          : data.nodeType === "text_prompt"
+            ? textStr.slice(0, 24) || "text prompt"
+            : promptStr.slice(0, 24) ||
+              data.nodeType.replace(/_/g, " ");
       return {
         id: n.id,
         kind: data.nodeType,

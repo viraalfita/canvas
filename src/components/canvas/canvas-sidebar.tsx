@@ -7,6 +7,7 @@ import {
   VideoIcon,
   ClapperboardIcon,
   FilmIcon,
+  TypeIcon,
 } from "lucide-react";
 import type { NodeType } from "@/lib/canvas/types";
 
@@ -17,6 +18,7 @@ const ITEMS: {
   group: "input" | "ai" | "compose" | "output";
 }[] = [
   { type: "image_upload", label: "Image Upload", icon: UploadIcon, group: "input" },
+  { type: "text_prompt", label: "Text Prompt", icon: TypeIcon, group: "input" },
   { type: "storyboard", label: "Storyboard", icon: ClapperboardIcon, group: "ai" },
   { type: "image_generate", label: "Image", icon: ImageIcon, group: "ai" },
   { type: "video_generate", label: "Video", icon: VideoIcon, group: "ai" },

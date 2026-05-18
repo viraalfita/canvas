@@ -255,6 +255,25 @@ function collectUpstream(
   return { outputs, usages };
 }
 
+/** Collect non-empty `text` values from upstream text_prompt nodes wired to
+ *  this node. Used to prepend a shared "general style" prompt to each scene
+ *  without copy-pasting it into every node. */
+function collectUpstreamTexts(
+  node: CanvasNodeRow,
+  nodes: CanvasNodeRow[],
+  edges: CanvasEdgeRow[],
+): string[] {
+  const inc = incomingEdges(edges, node.id);
+  const out: string[] = [];
+  for (const e of inc) {
+    const src = findNode(nodes, e.source_node_id);
+    if (!src || (src.type as string) !== "text_prompt") continue;
+    const text = (src.params as { text?: string }).text?.trim();
+    if (text) out.push(text);
+  }
+  return out;
+}
+
 /** Whether a node type spends APImart tokens / takes meaningful time. Used by
  *  sequential mode to decide what counts as "currently busy". Export, upload,
  *  storyboard, scene_composer don't burn tokens or run async via APImart. */
@@ -285,18 +304,46 @@ async function dispatchSingle(
   ctx: WorkflowContext,
   node: CanvasNodeRow,
   upstream: { outputs: NodeOutput[]; usages: (NodeUsage | null)[] },
+  upstreamTexts: string[] = [],
 ) {
   const t = node.type as string;
+  // Build an `enhancedPrompt` override that prepends upstream text_prompt
+  // contents to whatever the node already has. Persisted params stay
+  // untouched — the prefix only affects this submit call.
+  const textPrefix = upstreamTexts.join("\n\n").trim();
+  function withTextPrefix<
+    P extends { prompt?: string; enhancedPrompt?: string },
+  >(): Partial<P> | undefined {
+    if (!textPrefix) return undefined;
+    const params = node.params as Partial<P>;
+    const userPrompt =
+      params.enhancedPrompt?.trim() || params.prompt?.trim() || "";
+    const combined = userPrompt
+      ? `${textPrefix}\n\n${userPrompt}`
+      : textPrefix;
+    return { enhancedPrompt: combined } as Partial<P>;
+  }
+
   if (t === "image_generate" || t === "image_edit" || t === "image_merge") {
     const upstreamImages = upstream.outputs
       .filter((o) => o.kind === "image")
       .map((o) => o.url);
-    await submitImageNode(ctx, node, upstreamImages);
+    await submitImageNode(
+      ctx,
+      node,
+      upstreamImages,
+      withTextPrefix<ImageGenerateParams>(),
+    );
   } else if (t === "video_generate") {
     const upstreamImages = upstream.outputs
       .filter((o) => o.kind === "image")
       .map((o) => o.url);
-    await submitVideoNode(ctx, node, upstreamImages);
+    await submitVideoNode(
+      ctx,
+      node,
+      upstreamImages,
+      withTextPrefix<VideoGenerateParams>(),
+    );
   } else if (t === "export") {
     await resolveExportNode(
       ctx,
@@ -305,7 +352,7 @@ async function dispatchSingle(
       upstream.usages[0] ?? null,
     );
   }
-  // image_upload, storyboard, scene_composer: not dispatched here.
+  // image_upload, storyboard, scene_composer, text_prompt: not dispatched here.
 }
 
 /**
@@ -338,7 +385,8 @@ async function dispatchReadyNodes(
       // video's last frame. The next polling tick will retry once the
       // preprocess step caches the frame URL.
       if (isAwaitingFrameExtraction(node, upstream)) continue;
-      await dispatchSingle(ctx, node, upstream);
+      const upstreamTexts = collectUpstreamTexts(node, nodes, edges);
+      await dispatchSingle(ctx, node, upstream, upstreamTexts);
       // Stop after the first token-spending dispatch so the user can review
       // before the next one fires. Cheap nodes (export) finish synchronously
       // and we keep looping to drain them.
@@ -584,25 +632,8 @@ export async function runSingleNode(ctx: WorkflowContext, nodeId: string) {
   }
 
   const upstream = collectUpstream(node, nodes, edges);
-  const t = node.type as string;
-  if (t === "image_generate" || t === "image_edit" || t === "image_merge") {
-    const upstreamImages = upstream.outputs
-      .filter((o) => o.kind === "image")
-      .map((o) => o.url);
-    await submitImageNode(ctx, node, upstreamImages);
-  } else if (t === "video_generate") {
-    const upstreamImages = upstream.outputs
-      .filter((o) => o.kind === "image")
-      .map((o) => o.url);
-    await submitVideoNode(ctx, node, upstreamImages);
-  } else if (t === "export") {
-    await resolveExportNode(
-      ctx,
-      node,
-      upstream.outputs[0] ?? null,
-      upstream.usages[0] ?? null,
-    );
-  }
+  const upstreamTexts = collectUpstreamTexts(node, nodes, edges);
+  await dispatchSingle(ctx, node, upstream, upstreamTexts);
   return { ok: true as const };
 }
 

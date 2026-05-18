@@ -1,8 +1,13 @@
 "use client";
 
-import { Loader2Icon, CheckIcon, XIcon, CircleIcon } from "lucide-react";
+import { useState } from "react";
+import { useNodeId } from "@xyflow/react";
+import { Loader2Icon, CheckIcon, XIcon, CircleIcon, CopyIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { duplicateNode } from "@/lib/canvas/actions";
+import { rowToFlowNode, useCanvasStore } from "@/lib/canvas/store";
 import type { NodeStatus } from "@/lib/canvas/types";
+import { flushPendingSaves } from "./canvas-editor";
 
 export function StatusBadge({
   status,
@@ -27,6 +32,41 @@ export function StatusBadge({
       {label}
       {showPct && ` ${Math.round(progress!)}%`}
     </span>
+  );
+}
+
+/** Duplicate the current node — clones type, params, output and history with
+ *  a small positional offset so it lands next to the original. Lives in the
+ *  shell so every node type gets it for free. */
+function DuplicateNodeButton() {
+  const id = useNodeId();
+  const setNodes = useCanvasStore((s) => s.setNodes);
+  const [busy, setBusy] = useState(false);
+  if (!id) return null;
+  return (
+    <button
+      type="button"
+      title="Duplicate this node"
+      disabled={busy}
+      onClick={async (e) => {
+        e.stopPropagation();
+        if (busy) return;
+        setBusy(true);
+        try {
+          // Make sure any debounced param edits land before we copy.
+          await flushPendingSaves();
+          const row = await duplicateNode(id);
+          setNodes((curr) => [...curr, rowToFlowNode(row)]);
+        } catch (err) {
+          alert(err instanceof Error ? err.message : String(err));
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100 disabled:opacity-40"
+    >
+      <CopyIcon className="h-3.5 w-3.5" />
+    </button>
   );
 }
 
@@ -87,6 +127,7 @@ export function NodeShell({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={status} progress={progress} />
+          <DuplicateNodeButton />
           {headerAction}
         </div>
       </div>

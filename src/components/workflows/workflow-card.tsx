@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { MoreVerticalIcon, PencilIcon, Trash2Icon, ImageIcon } from "lucide-react";
+import {
+  MoreVerticalIcon,
+  PencilIcon,
+  Trash2Icon,
+  ImageIcon,
+  CopyIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WorkflowSummary } from "@/lib/canvas/actions";
 
@@ -19,10 +25,12 @@ function shortAge(iso: string) {
 export function WorkflowCard({
   workflow,
   onDelete,
+  onDuplicate,
   onRename,
 }: {
   workflow: WorkflowSummary;
   onDelete: () => void;
+  onDuplicate: () => void;
   onRename: (name: string) => Promise<void>;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -127,6 +135,17 @@ export function WorkflowCard({
                 >
                   <PencilIcon className="h-3.5 w-3.5" />
                   Rename
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDuplicate();
+                    setMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-800"
+                >
+                  <CopyIcon className="h-3.5 w-3.5" />
+                  Duplicate
                 </button>
                 <button
                   type="button"

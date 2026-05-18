@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Node Canvas — Cinematic Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --n50:#fafafa;--n100:#f5f5f5;--n200:#e5e5e5;--n300:#d4d4d4;--n400:#a3a3a3;
+    --n500:#737373;--n600:#525252;--n700:#404040;--n800:#262626;--n900:#171717;--n950:#0a0a0a;
+    --emerald:#10b981;--emerald400:#34d399;--emerald600:#059669;
+    --purple:#a855f7;--purple400:#c084fc;
+    --blue:#3b82f6;--blue400:#60a5fa;--blue500:#3b82f6;
+    --amber:#fbbf24;--red:#ef4444;--red300:#fca5a5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;background:#000;color:var(--n100);font-family:'Geist',system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+  .mono{font-family:'Geist Mono',ui-monospace,monospace}
+
+  .stage{position:fixed;inset:0;display:grid;place-items:center;background:#000}
+  .frame{
+    position:relative;width:100vw;height:56.25vw;max-height:100vh;max-width:177.78vh;
+    background:var(--n950);overflow:hidden;
+    box-shadow:0 0 0 1px #000, 0 30px 120px -20px rgba(96,165,250,.08);
+  }
+  .frame::after{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:200;
+    background:radial-gradient(120% 80% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%);
+  }
+
+  .app{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--n950)}
+
+  /* ---------- TOOLBAR ---------- */
+  .toolbar{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:.5rem 1rem;background:var(--n900);
+    border-bottom:1px solid var(--n800);height:44px;flex:none;z-index:5;
+  }
+  .toolbar .left{display:flex;align-items:center;gap:.75rem}
+  .toolbar .right{display:flex;align-items:center;gap:.5rem}
+  .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1px solid transparent;color:var(--n300);background:transparent;cursor:pointer}
+  .icon-btn:hover{background:var(--n800)}
+  .wf-name{font-size:13px;color:var(--n200);font-weight:500;padding:2px 6px;border-radius:6px}
+  .badge{display:inline-flex;align-items:center;gap:.35rem;font-size:11px;color:var(--n400);padding:2px 8px;border:1px solid var(--n800);border-radius:6px;background:var(--n950)}
+  .badge .dot{width:6px;height:6px;border-radius:50%;background:var(--emerald)}
+  .mode-toggle{display:inline-flex;align-items:center;gap:.35rem;font-size:11px;padding:4px 8px;border:1px solid var(--n800);border-radius:6px;color:var(--emerald400)}
+  .run-btn{display:inline-flex;align-items:center;gap:.35rem;font-size:12px;padding:5px 10px;background:var(--emerald600);color:#fff;border-radius:6px;font-weight:500;border:1px solid #047857}
+  .run-btn:hover{background:var(--emerald)}
+
+  .body{flex:1;display:flex;min-height:0;position:relative}
+
+  /* ---------- SIDEBAR ---------- */
+  .sidebar{
+    width:224px;flex:none;border-right:1px solid var(--n800);background:var(--n900);
+    display:flex;flex-direction:column;font-size:13px;z-index:3;
+  }
+  .side-header{padding:12px;border-bottom:1px solid var(--n800);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--n500)}
+  .side-group{padding:10px 8px;border-bottom:1px solid rgba(38,38,38,.6)}
+  .side-group-label{padding:0 4px 6px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--n500)}
+  .side-item{display:flex;align-items:center;gap:.5rem;padding:7px 8px;border-radius:6px;color:var(--n300);cursor:pointer;transition:background .15s}
+  .side-item:hover, .side-item.hl{background:var(--n800);color:var(--n100)}
+  .side-item svg{width:14px;height:14px;color:var(--n400)}
+
+  /* ---------- CANVAS ---------- */
+  .canvas{flex:1;position:relative;overflow:hidden;background:var(--n950)}
+  .dots{
+    position:absolute;inset:-20%;
+    background-image:radial-gradient(circle, #2a2a2a 1px, transparent 1px);
+    background-size:16px 16px;
+  }
+
+  /* World: positioning container, no transform */
+  #world{position:absolute;inset:0;overflow:visible}
+  /* Scene: fixed virtual 1600x900 stage centered in canvas. Camera transforms go here. */
+  #scene{
+    position:absolute;left:50%;top:50%;width:1600px;height:900px;
+    margin-left:-800px;margin-top:-450px;
+    transform-origin:center center;
+    will-change:transform;
+  }
+
+  /* ---------- NODES ---------- */
+  .node{
+    position:absolute;border-radius:8px;border:1px solid var(--n700);
+    background:var(--n900);box-shadow:0 4px 18px rgba(0,0,0,.4), 0 1px 0 rgba(255,255,255,.02) inset;
+    color:var(--n100);font-size:12px;overflow:hidden;
+  }
+  .node-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:8px 12px;border-bottom:1px solid var(--n800);background:var(--n900);
+  }
+  .node-title{font-size:12px;font-weight:600;color:var(--n100);display:flex;align-items:center;gap:.5rem}
+  .node-title .ico{width:14px;height:14px;color:var(--n400)}
+  .node-status{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--n500)}
+  .node-status .sdot{width:8px;height:8px;border-radius:50%;background:var(--n500)}
+  .node-status.queued .sdot{background:var(--amber)}
+  .node-status.running{color:var(--blue400)}
+  .node-status.running .sdot{background:var(--blue);box-shadow:0 0 8px rgba(96,165,250,.7);animation:pulseDot 1s infinite}
+  .node-status.success{color:var(--emerald400)}
+  .node-status.success .sdot{background:var(--emerald)}
+  @keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.3)}}
+
+  .node-progress{height:3px;background:var(--n800);position:relative;overflow:hidden}
+  .node-progress span{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));width:0%}
+
+  .node-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+  .label{font-size:10px;color:var(--n500);text-transform:uppercase;letter-spacing:.06em}
+  .select, .textarea, .input{
+    background:var(--n950);border:1px solid var(--n700);border-radius:6px;color:var(--n100);
+    padding:6px 8px;font-size:11px;font-family:inherit;width:100%;outline:none;
+  }
+  .textarea{min-height:54px;resize:none;line-height:1.45}
+  .select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23a3a3a3' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");background-repeat:no-repeat;background-position:right 8px center;padding-right:24px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+
+  .preview{
+    width:100%;border:1px solid var(--n800);border-radius:6px;background:var(--n950);
+    aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;
+  }
+  .preview.video{aspect-ratio:16/9}
+  .preview .ph{color:var(--n600);font-size:10px}
+  .preview img, .preview canvas, .preview .imggen{width:100%;height:100%;display:block;object-fit:cover}
+
+  .btn-gen{
+    display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+    background:var(--emerald600);color:#fff;border:1px solid #047857;border-radius:6px;padding:6px 10px;
+    font-size:11px;font-weight:500;cursor:pointer
+  }
+  .btn-gen .ico{width:12px;height:12px}
+
+  /* Handles */
+  .h{position:absolute;width:12px;height:12px;border-radius:50%;border:2px solid var(--n950);top:50%;transform:translateY(-50%);box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+  .h.in{left:-6px;background:var(--blue500)}
+  .h.out-img{right:-6px;background:var(--emerald)}
+  .h.out-vid{right:-6px;background:var(--purple)}
+  .h.out-txt{right:-6px;background:var(--blue500)}
+
+  /* Edges */
+  .edges{position:absolute;left:0;top:0;width:1600px;height:900px;pointer-events:none;overflow:visible}
+  .edge{fill:none;stroke-width:2.5;stroke-linecap:round;stroke-dasharray:6 6;stroke-dashoffset:0;animation:dash 1.4s linear infinite;opacity:0}
+  .edge.img{stroke:var(--emerald)}
+  .edge.vid{stroke:var(--purple)}
+  .edge.txt{stroke:var(--blue);stroke-width:2}
+  @keyframes dash{to{stroke-dashoffset:-24}}
+
+  /* ---------- PANELS ---------- */
+  .minimap{
+    position:absolute;right:12px;bottom:12px;width:170px;height:108px;border:1px solid var(--n800);
+    background:rgba(10,10,10,.85);border-radius:8px;backdrop-filter:blur(6px);overflow:hidden;z-index:4;
+  }
+  .minimap .mm-node{position:absolute;background:#3f3f46;border:1px solid #52525b;border-radius:2px}
+  .minimap .viewport{position:absolute;border:1.5px solid var(--blue);border-radius:3px;background:rgba(59,130,246,.08)}
+  .controls{
+    position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:1px;
+    background:var(--n900);border:1px solid var(--n800);border-radius:8px;overflow:hidden;z-index:4;
+  }
+  .controls button{width:28px;height:28px;display:grid;place-items:center;background:transparent;border:none;color:var(--n300);cursor:pointer}
+  .controls button:hover{background:var(--n800)}
+  .controls button + button{border-top:1px solid var(--n800)}
+
+  .queue{
+    position:absolute;right:12px;top:12px;width:240px;background:rgba(17,17,17,.85);
+    border:1px solid var(--n800);border-radius:8px;padding:10px;backdrop-filter:blur(8px);z-index:4;
+    opacity:0;transform:translateY(-4px);
+  }
+  .queue h4{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--n500);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+  .qrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--n800);font-size:11px}
+  .qrow:first-of-type{border-top:none}
+  .qrow .qdot{width:6px;height:6px;border-radius:50%;background:var(--blue);box-shadow:0 0 6px var(--blue)}
+  .qrow .qdot.ok{background:var(--emerald);box-shadow:0 0 6px var(--emerald)}
+  .qrow .qdot.q{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+  .qrow .qbar{flex:1;height:3px;background:var(--n800);border-radius:2px;overflow:hidden}
+  .qrow .qbar span{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--purple))}
+
+  /* ---------- TITLE / OUTRO ---------- */
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:90;pointer-events:none}
+  .ov-title{font-size:64px;font-weight:700;letter-spacing:-.03em;background:linear-gradient(180deg,#fff,#cbd5e1);-webkit-background-clip:text;background-clip:text;color:transparent;opacity:0;transform:translateY(10px);text-shadow:0 0 60px rgba(96,165,250,.25)}
+  .ov-sub{margin-top:10px;font-size:16px;color:var(--n400);opacity:0;transform:translateY(8px);letter-spacing:.02em}
+  .ov-stack{position:absolute;bottom:50px;left:0;right:0;text-align:center;font-size:12px;color:var(--n500);opacity:0}
+
+  /* ---------- FEATURE CAPTIONS ---------- */
+  /* Center-bottom floating caption that explains the current scene */
+  .caption{
+    position:absolute;left:50%;bottom:46px;transform:translateX(-50%) translateY(8px);
+    background:rgba(10,10,10,.88);border:1px solid var(--n700);
+    border-radius:12px;padding:14px 22px;display:flex;align-items:center;gap:14px;
+    backdrop-filter:blur(10px);box-shadow:0 12px 40px rgba(0,0,0,.55), 0 0 0 1px rgba(96,165,250,.08), 0 0 30px rgba(96,165,250,.06);
+    opacity:0;z-index:95;pointer-events:none;min-width:380px;max-width:640px;
+  }
+  .cap-ico{
+    flex:none;width:38px;height:38px;border-radius:10px;
+    background:linear-gradient(135deg, rgba(59,130,246,.18), rgba(168,85,247,.18));
+    border:1px solid var(--n700);display:grid;place-items:center;color:var(--blue400);
+  }
+  .cap-ico svg{width:18px;height:18px}
+  .cap-body{display:flex;flex-direction:column;gap:2px}
+  .cap-title{font-size:13px;font-weight:600;color:var(--n100);letter-spacing:.01em}
+  .cap-desc{font-size:11px;color:var(--n400);line-height:1.45}
+  .cap-step{font-size:9px;color:var(--blue400);letter-spacing:.14em;text-transform:uppercase;font-weight:600;margin-bottom:2px}
+
+  /* Toast notifications */
+  .toast{
+    position:absolute;left:50%;top:62px;transform:translateX(-50%);
+    background:rgba(17,17,17,.92);border:1px solid var(--n700);border-radius:999px;
+    padding:6px 14px;font-size:12px;color:var(--n200);z-index:85;
+    box-shadow:0 6px 24px rgba(0,0,0,.4);opacity:0;
+  }
+  .toast .dotg{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--emerald);box-shadow:0 0 8px var(--emerald);margin-right:6px;vertical-align:middle}
+
+  /* Procedural preview images */
+  .imggen{background:
+    radial-gradient(80% 60% at 30% 90%, #f59e0b88 0%, transparent 60%),
+    radial-gradient(70% 50% at 80% 80%, #ef444466 0%, transparent 60%),
+    radial-gradient(50% 50% at 50% 30%, #8b5cf688 0%, transparent 70%),
+    linear-gradient(180deg,#0b1224 0%, #1a1033 50%, #2a0f3c 100%);
+    position:relative;}
+  .imggen::before{content:"";position:absolute;left:0;right:0;bottom:25%;height:35%;background:
+    linear-gradient(180deg, transparent 0%, rgba(0,0,0,.5) 100%),
+    repeating-linear-gradient(90deg, rgba(252,211,77,.18) 0 2px, transparent 2px 5px),
+    repeating-linear-gradient(0deg, rgba(252,211,77,.06) 0 1px, transparent 1px 4px);}
+  .imggen::after{content:"";position:absolute;inset:0;background:
+    radial-gradient(2px 2px at 12% 18%, #fff8 50%, transparent 51%),
+    radial-gradient(2px 2px at 78% 12%, #fff6 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 40% 30%, #fff5 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 60% 22%, #fff6 50%, transparent 51%);}
+  .imggen.b{background:
+    radial-gradient(70% 60% at 50% 95%, #f97316aa 0%, transparent 65%),
+    radial-gradient(60% 50% at 20% 65%, #06b6d488 0%, transparent 60%),
+    radial-gradient(60% 50% at 80% 60%, #a855f7aa 0%, transparent 65%),
+    linear-gradient(180deg,#0a0f1f 0%, #1b0b2a 50%, #2a0f1c 100%)}
+
+  .videogen{
+    background:linear-gradient(180deg,#0b1224,#1a1033 60%, #f59e0b 110%);
+    position:relative;overflow:hidden;
+  }
+  .videogen::before{
+    content:"";position:absolute;inset:0;
+    background:
+      radial-gradient(40% 30% at 50% 30%, rgba(252,211,77,.55), transparent 60%),
+      repeating-linear-gradient(90deg, rgba(252,211,77,.12) 0 2px, transparent 2px 5px);
+    animation:pan 4s linear infinite;
+  }
+  @keyframes pan{from{transform:translateX(-4%)}to{transform:translateX(4%)}}
+
+  .caret{display:inline-block;width:1px;height:1em;background:var(--n100);vertical-align:-2px;animation:blink 1s steps(2) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ================= TIMELINE ================= */
+
+  /* Init states (hidden) */
+  #title{opacity:0}
+  #appshell{opacity:0;transform:scale(1.02)}
+  .node{opacity:0;transform:scale(.92)}
+  .edge{opacity:0}
+
+  /* Title scene */
+  #title .ov-title{animation:fadeRise 1.2s .4s forwards}
+  #title .ov-sub{animation:fadeRise 1.2s 1.1s forwards}
+  #title{animation:titleHold 4s linear forwards}
+  @keyframes fadeRise{to{opacity:1;transform:translateY(0)}}
+  @keyframes titleHold{0%{opacity:0}5%{opacity:1}80%{opacity:1}100%{opacity:0}}
+
+  /* App fade in */
+  #appshell{animation:appIn 1.8s 2.6s forwards cubic-bezier(.2,.7,.2,1)}
+  @keyframes appIn{0%{opacity:0;transform:scale(1.04)}100%{opacity:1;transform:scale(1)}}
+
+  /* ---------- CAMERA — applied to #scene ---------- */
+  /* Reference: scene is 1600x900 centered. Node centers:
+     prompt(345,450), image1(850,440), image2(850,700),
+     video(1370,600), scene-comp(950,870), export(1420,900)
+     translate = -(nx-800)*s, -(ny-450)*s
+  */
+  #scene{animation:cam 92s linear forwards}
+  @keyframes cam{
+    /* 0-5s: fit overview (slight zoom out so full graph visible) */
+    0%   {transform:translate(0px,0px) scale(.78)}
+    5%   {transform:translate(0px,0px) scale(.78)}
+
+    /* 5-9s: nodes spawning — keep overview */
+    9%   {transform:translate(0px,0px) scale(.78)}
+
+    /* 9-14s: ease to prompt area (center ~345,450), scale 1.0 */
+    /* tx = -(345-800)*1.0 = 455, ty = 0 */
+    14%  {transform:translate(380px, 30px) scale(.95)}
+
+    /* 14-22s: zoom INTO prompt node at scale 1.55 */
+    /* tx = -(345-800)*1.55 = 705, ty = 0 */
+    18%  {transform:translate(705px, 0px) scale(1.55)}
+    28%  {transform:translate(705px, 0px) scale(1.55)}
+
+    /* 28-32s: pull back to show prompt + image1 (midpoint ~600,445), scale 1.05 */
+    /* tx = -(600-800)*1.05 = 210, ty = -(445-450)*1.05 = 5 */
+    32%  {transform:translate(210px, 5px) scale(1.05)}
+
+    /* 32-44s: zoom on image1 (850,440), scale 1.45 */
+    /* tx = -(850-800)*1.45 = -73, ty = -(440-450)*1.45 = 15 */
+    36%  {transform:translate(-73px, 15px) scale(1.45)}
+    44%  {transform:translate(-73px, 15px) scale(1.45)}
+
+    /* 44-52s: show both images (midpoint 850,570), scale 1.05 */
+    /* tx = -(850-800)*1.05 = -53, ty = -(570-450)*1.05 = -126 */
+    48%  {transform:translate(-53px, -126px) scale(1.05)}
+    52%  {transform:translate(-53px, -126px) scale(1.05)}
+
+    /* 52-64s: zoom on video gen (1370,600), scale 1.3 */
+    /* tx = -(1370-800)*1.3 = -741, ty = -(600-450)*1.3 = -195 */
+    56%  {transform:translate(-741px, -195px) scale(1.3)}
+    66%  {transform:translate(-741px, -195px) scale(1.3)}
+
+    /* 66-74s: pan to scene composer (950,870), scale 1.2 */
+    /* tx = -(950-800)*1.2 = -180, ty = -(870-450)*1.2 = -504 */
+    70%  {transform:translate(-180px, -504px) scale(1.2)}
+    74%  {transform:translate(-180px, -504px) scale(1.2)}
+
+    /* 74-84s: pan to export node (1420,900), scale 1.2 */
+    /* tx = -(1420-800)*1.2 = -744, ty = -(900-450)*1.2 = -540 */
+    78%  {transform:translate(-744px, -540px) scale(1.2)}
+    84%  {transform:translate(-744px, -540px) scale(1.2)}
+
+    /* 84-92s: pull out to full workflow */
+    88%  {transform:translate(0px,0px) scale(.72)}
+    100% {transform:translate(0px,0px) scale(.7)}
+  }
+
+  /* ---------- NODE REVEAL ---------- */
+  #prompt-node    {animation:nodeIn .6s 5.5s forwards cubic-bezier(.2,.7,.2,1)}
+  #img-node       {animation:nodeIn .6s 6.3s forwards cubic-bezier(.2,.7,.2,1)}
+  #vid-node       {animation:nodeIn .6s 7.1s forwards cubic-bezier(.2,.7,.2,1)}
+  #img-node-2     {animation:nodeIn .6s 44s  forwards cubic-bezier(.2,.7,.2,1)}
+  #scene-node     {animation:nodeIn .6s 64s  forwards cubic-bezier(.2,.7,.2,1)}
+  #export-node    {animation:nodeIn .6s 74s  forwards cubic-bezier(.2,.7,.2,1)}
+  @keyframes nodeIn{0%{opacity:0;transform:scale(.85) translateY(8px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+
+  /* Prompt node glow when focused */
+  #prompt-node{animation:nodeIn .6s 5.5s forwards cubic-bezier(.2,.7,.2,1), glow 8s 16s forwards}
+  @keyframes glow{
+    0%{box-shadow:0 4px 18px rgba(0,0,0,.4)}
+    30%{box-shadow:0 0 0 1px rgba(96,165,250,.5),0 0 28px rgba(96,165,250,.3)}
+    100%{box-shadow:0 0 0 1px rgba(96,165,250,.2),0 0 18px rgba(96,165,250,.12)}
+  }
+
+  /* Typing prompt */
+  #typed{display:inline-block;white-space:pre;overflow:hidden;width:0;animation:type 5s 18s steps(50,end) forwards}
+  @keyframes type{to{width:32ch}}
+
+  /* Edges */
+  #edge-p2i  {animation:edgeShow .4s 33s forwards}
+  #edge-p2i2 {animation:edgeShow .4s 46s forwards}
+  #edge-i2v  {animation:edgeShow .4s 53s forwards}
+  #edge-i22v {animation:edgeShow .4s 53.4s forwards}
+  #edge-v2s  {animation:edgeShow .4s 65s forwards}
+  #edge-s2e  {animation:edgeShow .4s 75s forwards}
+  @keyframes edgeShow{to{opacity:1}}
+
+  /* Status / progress */
+  #img-progress span    {animation:progress 5s 35s forwards}
+  #img2-progress span   {animation:progress 4s 48s forwards}
+  #vid-progress span    {animation:progress 6s 57s forwards}
+  #scene-progress span  {animation:progress 4s 67s forwards}
+  #export-progress span {animation:progress 4s 77s forwards}
+  @keyframes progress{from{width:0%}to{width:100%}}
+
+  /* Preview image fades */
+  #img-preview-loaded   {opacity:0;animation:fadeIn 1s 40s forwards}
+  #img2-preview-loaded  {opacity:0;animation:fadeIn 1s 52s forwards}
+  #vid-preview-loaded   {opacity:0;animation:fadeIn 1s 63s forwards}
+  @keyframes fadeIn{to{opacity:1}}
+
+  /* Status swap */
+  .status-stack{position:relative;display:inline-grid}
+  .status-stack > *{grid-area:1/1}
+  .st-idle{opacity:1}
+  .st-run{opacity:0}
+  .st-ok{opacity:0}
+
+  #img-status    .st-run{animation:show .3s 35s forwards, hide 0s 40s forwards}
+  #img-status    .st-ok {animation:show 0s 40s forwards}
+  #img-status    .st-idle{animation:hide 0s 35s forwards}
+
+  #img2-status   .st-run{animation:show .3s 48s forwards, hide 0s 52s forwards}
+  #img2-status   .st-ok {animation:show 0s 52s forwards}
+  #img2-status   .st-idle{animation:hide 0s 48s forwards}
+
+  #vid-status    .st-run{animation:show .3s 57s forwards, hide 0s 63s forwards}
+  #vid-status    .st-ok {animation:show 0s 63s forwards}
+  #vid-status    .st-idle{animation:hide 0s 57s forwards}
+
+  #scene-status  .st-run{animation:show .3s 67s forwards, hide 0s 71s forwards}
+  #scene-status  .st-ok {animation:show 0s 71s forwards}
+  #scene-status  .st-idle{animation:hide 0s 67s forwards}
+
+  #export-status .st-run{animation:show .3s 77s forwards, hide 0s 81s forwards}
+  #export-status .st-ok {animation:show 0s 81s forwards}
+  #export-status .st-idle{animation:hide 0s 77s forwards}
+
+  @keyframes show{to{opacity:1}}
+  @keyframes hide{to{opacity:0}}
+
+  /* Queue panel */
+  #queue{animation:queueIn 1s 35s forwards, queueOut .8s 84s forwards}
+  @keyframes queueIn{to{opacity:1;transform:translateY(0)}}
+  @keyframes queueOut{to{opacity:0}}
+
+  /* Toasts */
+  #toast1{animation:toast 3s 40.2s forwards}
+  #toast2{animation:toast 3s 63.2s forwards}
+  #toast3{animation:toast 3s 81.2s forwards}
+  @keyframes toast{
+    0%{opacity:0;transform:translateX(-50%) translateY(-4px)}
+    15%{opacity:1;transform:translateX(-50%) translateY(0)}
+    85%{opacity:1}
+    100%{opacity:0;transform:translateX(-50%) translateY(-4px)}
+  }
+
+  /* Minimap fades in alongside nodes */
+  .mm-node{opacity:0;animation:mmFade .8s linear forwards}
+  #mm-prompt {animation-delay:5.5s}
+  #mm-img    {animation-delay:6.3s}
+  #mm-vid    {animation-delay:7.1s}
+  #mm-img2   {animation-delay:44s}
+  #mm-scene  {animation-delay:64s}
+  #mm-export {animation-delay:74s}
+  @keyframes mmFade{to{opacity:1}}
+
+  /* Sidebar highlight cycles when introducing node library */
+  .side-item.s1{animation:hl 1.2s 5.2s forwards}
+  .side-item.s2{animation:hl 1.2s 6s forwards}
+  .side-item.s3{animation:hl 1.2s 6.8s forwards}
+  @keyframes hl{0%,100%{background:transparent}50%{background:var(--n800)}}
+
+  /* Outro */
+  #outro{opacity:0;animation:outro 6s 86s forwards}
+  #outro .ov-title{opacity:1}
+  #outro .ov-sub{opacity:1}
+  #outro .ov-stack{opacity:1}
+  @keyframes outro{0%{opacity:0}25%{opacity:1}90%{opacity:1}100%{opacity:1}}
+
+  /* ---------- CAPTION TIMELINE ---------- */
+  .caption{animation-fill-mode:forwards}
+  @keyframes capIn{
+    0%   {opacity:0;transform:translateX(-50%) translateY(8px)}
+    10%  {opacity:1;transform:translateX(-50%) translateY(0)}
+    90%  {opacity:1;transform:translateX(-50%) translateY(0)}
+    100% {opacity:0;transform:translateX(-50%) translateY(-4px)}
+  }
+  #cap-1 {animation:capIn 5s 4s    forwards}  /* 4-9s : intro */
+  #cap-2 {animation:capIn 7s 9s    forwards}  /* 9-16s : add nodes */
+  #cap-3 {animation:capIn 12s 16s  forwards}  /* 16-28s : prompt */
+  #cap-4 {animation:capIn 12s 32s  forwards}  /* 32-44s : image gen */
+  #cap-5 {animation:capIn 8s 44s   forwards}  /* 44-52s : parallel images */
+  #cap-6 {animation:capIn 12s 54s  forwards}  /* 54-66s : video gen */
+  #cap-7 {animation:capIn 8s 66s   forwards}  /* 66-74s : scene composer */
+  #cap-8 {animation:capIn 10s 74s  forwards}  /* 74-84s : export */
+  #cap-9 {animation:capIn 4s 84s   forwards}  /* 84-88s : overview */
+
+  .dots{animation:drift 60s linear infinite alternate}
+  @keyframes drift{from{transform:translate(0,0)}to{transform:translate(-12px,-8px)}}
+
+  .spin{animation:spin 1.1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="frame">
+
+    <!-- ============ TITLE OVERLAY ============ -->
+    <div id="title" class="overlay">
+      <div class="ov-title">Node Canvas</div>
+      <div class="ov-sub">Build AI workflows visually.</div>
+    </div>
+
+    <!-- ============ APP SHELL ============ -->
+    <div id="appshell" class="app">
+
+      <!-- TOOLBAR -->
+      <div class="toolbar">
+        <div class="left">
+          <button class="icon-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <span class="wf-name">cinematic_city_workflow</span>
+          <span class="badge"><span class="dot"></span>Saved · just now</span>
+        </div>
+        <div class="right">
+          <span class="badge mono">Balance · $12.40</span>
+          <span class="mode-toggle">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1.5"/><circle cx="4" cy="12" r="1.5"/><circle cx="4" cy="18" r="1.5"/></svg>
+            Sequential
+          </span>
+          <button class="run-btn">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg>
+            Run All
+          </button>
+          <button class="icon-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+        </div>
+      </div>
+
+      <!-- BODY -->
+      <div class="body">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+          <div class="side-header">Nodes</div>
+
+          <div class="side-group">
+            <div class="side-group-label">Input</div>
+            <div class="side-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Image Upload
+            </div>
+          </div>
+
+          <div class="side-group">
+            <div class="side-group-label">AI</div>
+            <div class="side-item s1">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              Image Generator
+            </div>
+            <div class="side-item s2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+              Video Generator
+            </div>
+            <div class="side-item s3">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+              Storyboard
+            </div>
+          </div>
+
+          <div class="side-group">
+            <div class="side-group-label">Compose</div>
+            <div class="side-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/></svg>
+              Scene Composer
+            </div>
+          </div>
+
+          <div class="side-group" style="border-bottom:none">
+            <div class="side-group-label">Output</div>
+            <div class="side-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export
+            </div>
+          </div>
+        </aside>
+
+        <!-- CANVAS -->
+        <div class="canvas">
+          <div class="dots"></div>
+
+          <div id="world">
+            <div id="scene">
+
+              <!-- ============ EDGES ============ -->
+              <svg class="edges" viewBox="0 0 1600 900">
+                <!-- prompt(out: 470,378) -> image1(in: 720,340) -->
+                <path id="edge-p2i"  class="edge txt" d="M 470 378 C 600 378, 600 340, 720 340" />
+                <!-- prompt -> image2(in: 720,600) -->
+                <path id="edge-p2i2" class="edge txt" d="M 470 378 C 600 378, 600 600, 720 600" />
+                <!-- image1(out: 986,340) -> video(in upper: 1240,485) -->
+                <path id="edge-i2v"  class="edge img" d="M 986 340 C 1110 340, 1120 485, 1240 485" />
+                <!-- image2(out: 986,600) -> video(in lower: 1240,560) -->
+                <path id="edge-i22v" class="edge img" d="M 986 600 C 1110 600, 1120 560, 1240 560" />
+                <!-- video(out: 1506,520) -> scene composer(in: 820,820) -->
+                <path id="edge-v2s"  class="edge vid" d="M 1506 520 C 1560 520, 940 820, 820 820" />
+                <!-- scene composer(out: 1086,820) -> export(in: 1300,860) -->
+                <path id="edge-s2e"  class="edge vid" d="M 1086 820 C 1200 820, 1240 860, 1300 860" />
+              </svg>
+
+              <!-- ============ NODES ============ -->
+
+              <!-- PROMPT NODE :: center(345, 378) -->
+              <div id="prompt-node" class="node" style="left:220px;top:300px;width:250px;">
+                <div class="node-head">
+                  <div class="node-title">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H5.17L4 17.17V4z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="12" x2="13" y2="12"/></svg>
+                    Prompt
+                  </div>
+                  <span class="node-status"><span class="sdot"></span>idle</span>
+                </div>
+                <div class="node-body">
+                  <div class="label">Text</div>
+                  <div class="textarea" style="font-family:'Geist Mono',monospace;font-size:11px;line-height:1.5;color:var(--n200)"><span id="typed">a futuristic city at night,
+cinematic lighting</span><span class="caret"></span></div>
+                  <div class="label" style="margin-top:2px">Variables</div>
+                  <div class="row2">
+                    <div class="select">style: cinematic</div>
+                    <div class="select">tone: neon</div>
+                  </div>
+                </div>
+                <span class="h out-txt"></span>
+              </div>
+
+              <!-- IMAGE GENERATOR 1 :: center(850, 440) -->
+              <div id="img-node" class="node" style="left:720px;top:240px;width:266px;">
+                <div class="node-head">
+                  <div class="node-title">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    Image Generator
+                  </div>
+                  <span id="img-status" class="node-status status-stack">
+                    <span class="st-idle"><span class="sdot"></span>idle</span>
+                    <span class="st-run"><svg class="spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="3"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> running</span>
+                    <span class="st-ok"><span class="sdot" style="background:var(--emerald)"></span><span style="color:var(--emerald400)">success</span></span>
+                  </span>
+                </div>
+                <div id="img-progress" class="node-progress"><span></span></div>
+                <div class="node-body">
+                  <div class="row2">
+                    <div><div class="label">Model</div><div class="select">flux-pro-1.1</div></div>
+                    <div><div class="label">Aspect</div><div class="select">16:9</div></div>
+                  </div>
+                  <div class="preview">
+                    <div class="ph">preview</div>
+                    <div id="img-preview-loaded" class="imggen" style="position:absolute;inset:0"></div>
+                  </div>
+                  <button class="btn-gen">
+                    <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg>
+                    Generate
+                  </button>
+                </div>
+                <span class="h in"></span>
+                <span class="h out-img"></span>
+              </div>
+
+              <!-- IMAGE GENERATOR 2 :: center(850, 700) -->
+              <div id="img-node-2" class="node" style="left:720px;top:500px;width:266px;">
+                <div class="node-head">
+                  <div class="node-title">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    Image Generator
+                  </div>
+                  <span id="img2-status" class="node-status status-stack">
+                    <span class="st-idle"><span class="sdot"></span>idle</span>
+                    <span class="st-run"><svg class="spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="3"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> running</span>
+                    <span class="st-ok"><span class="sdot" style="background:var(--emerald)"></span><span style="color:var(--emerald400)">success</span></span>
+                  </span>
+                </div>
+                <div id="img2-progress" class="node-progress"><span></span></div>
+                <div class="node-body">
+                  <div class="row2">
+                    <div><div class="label">Model</div><div class="select">flux-pro-1.1</div></div>
+                    <div><div class="label">Aspect</div><div class="select">16:9</div></div>
+                  </div>
+                  <div class="preview">
+                    <div class="ph">preview</div>
+                    <div id="img2-preview-loaded" class="imggen b" style="position:absolute;inset:0"></div>
+                  </div>
+                  <button class="btn-gen">
+                    <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg>
+                    Generate
+                  </button>
+                </div>
+                <span class="h in"></span>
+                <span class="h out-img"></span>
+              </div>
+
+              <!-- VIDEO GENERATOR :: center(1370, 520) -->
+              <div id="vid-node" class="node" style="left:1240px;top:380px;width:266px;">
+                <div class="node-head">
+                  <div class="node-title">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                    Video Generator
+                  </div>
+                  <span id="vid-status" class="node-status status-stack">
+                    <span class="st-idle"><span class="sdot"></span>idle</span>
+                    <span class="st-run"><svg class="spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="3"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> running</span>
+                    <span class="st-ok"><span class="sdot" style="background:var(--emerald)"></span><span style="color:var(--emerald400)">success</span></span>
+                  </span>
+                </div>
+                <div id="vid-progress" class="node-progress"><span></span></div>
+                <div class="node-body">
+                  <div class="label">Prompt</div>
+                  <div class="textarea" style="font-family:'Geist Mono',monospace;font-size:11px;color:var(--n200)">smooth cinematic transition from night to sunrise</div>
+                  <div class="row2">
+                    <div><div class="label">Duration</div><div class="select">5s</div></div>
+                    <div><div class="label">FPS</div><div class="select">30</div></div>
+                  </div>
+                  <div class="row2">
+                    <div><div class="label">Aspect</div><div class="select">16:9</div></div>
+                    <div><div class="label">Camera</div><div class="select">slow push-in</div></div>
+                  </div>
+                  <div class="preview video">
+                    <div class="ph">preview</div>
+                    <div id="vid-preview-loaded" class="videogen" style="position:absolute;inset:0"></div>
+                  </div>
+                  <button class="btn-gen">
+                    <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg>
+                    Generate Video
+                  </button>
+                </div>
+                <span class="h in" style="top:38%"></span>
+                <span class="h in" style="top:62%"></span>
+                <span class="h out-vid"></span>
+              </div>
+
+              <!-- SCENE COMPOSER :: center(953, 820) -->
+              <div id="scene-node" class="node" style="left:820px;top:720px;width:266px;">
+                <div class="node-head">
+                  <div class="node-title">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/></svg>
+                    Scene Composer
+                  </div>
+                  <span id="scene-status" class="node-status status-stack">
+                    <span class="st-idle"><span class="sdot"></span>idle</span>
+                    <span class="st-run"><svg class="spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="3"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> composing</span>
+                    <span class="st-ok"><span class="sdot" style="background:var(--emerald)"></span><span style="color:var(--emerald400)">success</span></span>
+                  </span>
+                </div>
+                <div id="scene-progress" class="node-progress"><span></span></div>
+                <div class="node-body">
+                  <div class="label">Timeline · 2 clips</div>
+                  <div style="display:flex;gap:4px;height:36px;align-items:stretch">
+                    <div style="flex:1;border:1px solid var(--n800);background:linear-gradient(135deg,#1f2937,#0f172a);border-radius:4px;position:relative;overflow:hidden">
+                      <div style="position:absolute;bottom:2px;left:4px;font-size:9px;color:var(--n400)" class="mono">scene_01 · 5s</div>
+                    </div>
+                    <div style="flex:1;border:1px solid var(--n800);background:linear-gradient(135deg,#312e81,#1e1b4b);border-radius:4px;position:relative;overflow:hidden">
+                      <div style="position:absolute;bottom:2px;left:4px;font-size:9px;color:var(--n400)" class="mono">scene_02 · 5s</div>
+                    </div>
+                  </div>
+                  <div class="label">Transition</div>
+                  <div class="select">crossfade · 400ms</div>
+                  <button class="btn-gen">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18"/></svg>
+                    Compose
+                  </button>
+                </div>
+                <span class="h in"></span>
+                <span class="h out-vid"></span>
+              </div>
+
+              <!-- EXPORT NODE :: center(1420, 860) -->
+              <div id="export-node" class="node" style="left:1300px;top:760px;width:240px;">
+                <div class="node-head">
+                  <div class="node-title">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Export
+                  </div>
+                  <span id="export-status" class="node-status status-stack">
+                    <span class="st-idle"><span class="sdot"></span>idle</span>
+                    <span class="st-run"><svg class="spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="3"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> preparing</span>
+                    <span class="st-ok"><span class="sdot" style="background:var(--emerald)"></span><span style="color:var(--emerald400)">ready</span></span>
+                  </span>
+                </div>
+                <div id="export-progress" class="node-progress"><span></span></div>
+                <div class="node-body">
+                  <div class="preview video" style="aspect-ratio:16/9">
+                    <div class="videogen" style="position:absolute;inset:0"></div>
+                  </div>
+                  <button class="btn-gen" style="background:#fff;color:#171717;border-color:#e5e5e5">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download
+                  </button>
+                </div>
+                <span class="h in"></span>
+              </div>
+
+            </div><!-- /#scene -->
+          </div><!-- /#world -->
+
+          <!-- QUEUE PANEL (overlay, not in scene) -->
+          <div id="queue" class="queue">
+            <h4>Generation Queue <span style="color:var(--n400);text-transform:none;letter-spacing:0">3 jobs</span></h4>
+            <div class="qrow"><span class="qdot ok"></span><span style="flex:1">image · flux-pro</span><span style="color:var(--emerald400)">done</span></div>
+            <div class="qrow"><span class="qdot"></span><span style="flex:1">video · sora2</span><div class="qbar"><span style="width:62%"></span></div></div>
+            <div class="qrow"><span class="qdot q"></span><span style="flex:1">scene-compose</span><span style="color:var(--amber)">queued</span></div>
+          </div>
+
+          <!-- MINIMAP -->
+          <div class="minimap">
+            <div id="mm-prompt"  class="mm-node" style="left:14%;top:28%;width:16%;height:18%"></div>
+            <div id="mm-img"     class="mm-node" style="left:38%;top:22%;width:18%;height:18%;background:#064e3b;border-color:#10b981"></div>
+            <div id="mm-img2"    class="mm-node" style="left:38%;top:54%;width:18%;height:18%;background:#064e3b;border-color:#10b981"></div>
+            <div id="mm-vid"     class="mm-node" style="left:64%;top:38%;width:18%;height:18%;background:#3b0764;border-color:#a855f7"></div>
+            <div id="mm-scene"   class="mm-node" style="left:42%;top:74%;width:18%;height:14%"></div>
+            <div id="mm-export"  class="mm-node" style="left:72%;top:76%;width:16%;height:14%"></div>
+            <div class="viewport" style="left:8%;top:14%;width:60%;height:60%"></div>
+          </div>
+
+          <!-- CONTROLS -->
+          <div class="controls">
+            <button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+            <button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+            <button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+            <button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
+          </div>
+
+          <!-- Toasts -->
+          <div id="toast1" class="toast"><span class="dotg"></span>Image generated · cached in R2</div>
+          <div id="toast2" class="toast"><span class="dotg"></span>Video render complete · 5.0s · 30fps</div>
+          <div id="toast3" class="toast"><span class="dotg"></span>Downloaded · export-1747511820.mp4</div>
+
+          <!-- ============ FEATURE CAPTIONS ============ -->
+          <div id="cap-1" class="caption">
+            <div class="cap-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
+            </div>
+            <div class="cap-body">
+              <div class="cap-step">01 · Node Canvas</div>
+              <div class="cap-title">A visual editor for AI workflows</div>
+              <div class="cap-desc">React Flow canvas with a drag-and-drop node library, live execution, and real-time previews.</div>
+            </div>
+          </div>
+
+          <div id="cap-2" class="caption">
+            <div class="cap-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+            <div class="cap-body">
+              <div class="cap-step">02 · Node Library</div>
+              <div class="cap-title">Drag in any node — Prompt, Image, Video</div>
+              <div class="cap-desc">Pick from the sidebar or right-click the canvas to build your pipeline in seconds.</div>
+            </div>
+          </div>
+
+          <div id="cap-3" class="caption">
+            <div class="cap-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H5.17L4 17.17V4z"/><line x1="8" y1="9" x2="16" y2="9"/></svg>
+            </div>
+            <div class="cap-body">
+              <div class="cap-step">03 · Prompt Node</div>
+              <div class="cap-title">Write your idea in natural language</div>
+              <div class="cap-desc">A single prompt flows downstream — every connected node inherits and reacts to it.</div>
+            </div>
+          </div>
+
+          <div id="cap-4" class="caption">
+            <div class="cap-ico" style="color:var(--emerald400)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+            <div class="cap-body">
+              <div class="cap-step">04 · Image Generator</div>
+              <div class="cap-title">Connect & generate — instantly</div>
+              <div class="cap-desc">Drag an edge from Prompt → Image. Status flips idle → running → success with live progress.</div>
+            </div>
+          </div>
+
+          <div id="cap-5" class="caption">
+            <div class="cap-ico" style="color:var(--amber)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+            </div>
+            <div class="cap-body">
+              <div class="cap-step">05 · Parallel Execution</div>
+              <div class="cap-title">Branch the graph — render variations in parallel</div>
+              <div class="cap-desc">Multiple nodes run side by side, polling provider jobs and streaming previews as each completes.</div>
+            </div>
+          </div>
+
+          <div id="cap-6" class="caption">
+            <div class="cap-ico" style="color:var(--purple400)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+            </div>
+            <div class="cap-body">
+              <div class="cap-step">06 · Video Generator</div>
+              <div class="cap-title">Turn images into cinematic motion</div>
+              <div class="cap-desc">Duration, FPS, aspect ratio, camera movement — control everything from the node panel.</div>
+            </div>
+          </div>
+
+          <div id="cap-7" class="caption">
+            <div class="cap-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/></svg>
+            </div>
+            <div class="cap-body">
+              <div class="cap-step">07 · Scene Composer</div>
+              <div class="cap-title">Assemble clips on a timeline</div>
+              <div class="cap-desc">Crossfade, sequence, and stitch generated clips into a finished scene — no editor required.</div>
+            </div>
+          </div>
+
+          <div id="cap-8" class="caption">
+            <div class="cap-ico" style="color:var(--emerald400)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <div class="cap-body">
+              <div class="cap-step">08 · Export</div>
+              <div class="cap-title">Download your finished render</div>
+              <div class="cap-desc">The Export node pulls the final media straight from Supabase Storage and saves it to your machine.</div>
+            </div>
+          </div>
+
+          <div id="cap-9" class="caption">
+            <div class="cap-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+            </div>
+            <div class="cap-body">
+              <div class="cap-step">09 · End-to-end</div>
+              <div class="cap-title">From prompt to finished video</div>
+              <div class="cap-desc">Powered by Next.js · React Flow · Zustand · Supabase Storage.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ OUTRO ============ -->
+    <div id="outro" class="overlay">
+      <div class="ov-title">Node Canvas</div>
+      <div class="ov-sub">Visual AI workflow generation.</div>
+      <div class="ov-stack">Powered by Next.js · React Flow · Zustand · Supabase Storage</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Click anywhere to restart the animation (useful for re-recording)
+  document.body.addEventListener('click', () => {
+    document.body.style.display='none';
+    document.body.offsetHeight;
+    document.body.style.display='';
+  });
+</script>
+</body>
+</html>

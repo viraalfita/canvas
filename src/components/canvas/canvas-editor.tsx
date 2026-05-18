@@ -44,6 +44,7 @@ import { VideoGenerateNode } from "./node-video-generate";
 import { StoryboardNode } from "./node-storyboard";
 import { SceneComposerNode } from "./node-scene-composer";
 import { ExportNode } from "./node-export";
+import { TextPromptNode } from "./node-text-prompt";
 import { CanvasSidebar } from "./canvas-sidebar";
 import { CanvasToolbar } from "./canvas-toolbar";
 
@@ -59,6 +60,7 @@ const nodeTypes = {
   storyboard: StoryboardNode,
   scene_composer: SceneComposerNode,
   export: ExportNode,
+  text_prompt: TextPromptNode,
 };
 
 /** Thicken + color edges by source handle so the data-flow type is obvious

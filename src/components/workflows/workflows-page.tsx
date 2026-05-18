@@ -6,6 +6,7 @@ import { PlusIcon, LogOutIcon, LayoutGridIcon } from "lucide-react";
 import {
   createWorkflow,
   deleteWorkflow,
+  duplicateWorkflow,
   renameWorkflow,
   type WorkflowSummary,
 } from "@/lib/canvas/actions";
@@ -39,6 +40,15 @@ export function WorkflowsPage({
     try {
       await deleteWorkflow(id);
       setWorkflows((curr) => curr.filter((w) => w.id !== id));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function onDuplicate(id: string) {
+    try {
+      const newId = await duplicateWorkflow(id);
+      router.push(`/canvas/${newId}`);
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
     }
@@ -117,6 +127,7 @@ export function WorkflowsPage({
                 key={w.id}
                 workflow={w}
                 onDelete={() => onDelete(w.id)}
+                onDuplicate={() => onDuplicate(w.id)}
                 onRename={(name) => onRename(w.id, name)}
               />
             ))}

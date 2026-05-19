@@ -1,0 +1,4 @@
+# Copy to `.dev.vars` for local development (wrangler dev auto-loads).
+# In production these are set via `wrangler secret put <NAME>`.
+
+CANVAS_INTERNAL_TOKEN=replace-me-with-32-byte-random

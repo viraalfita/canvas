@@ -9,7 +9,9 @@
       "Bash(NEXT_PUBLIC_SUPABASE_URL=https://x.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy SUPABASE_SERVICE_ROLE_KEY=dummy APIMART_API_KEY=dummy INTERNAL_LLM_API_KEY=dummy pnpm build)",
       "Bash(perl -pi -e 's/!h-3 !w-3 !bg-\\(\\\\w+\\)-\\(\\\\d+\\)/h-3! w-3! bg-$1-$2!/g' node-scene-composer.tsx node-image-upload.tsx node-image-generate.tsx node-video-generate.tsx node-export.tsx)",
       "WebFetch(domain:developers.heygen.com)",
-      "WebFetch(domain:docs.heygen.com)"
+      "WebFetch(domain:docs.heygen.com)",
+      "Bash(curl -s -H \"Authorization: Bearer +E5qK4r8p/J2t+IFGU0VZc623RHPq0xKK6qTaaZvzFo=\" http://localhost:8787/mcp/tools)",
+      "Bash(python3 -c \"import sys, json; d=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\(f\\\\\"{t['name']:30s} — {t.get\\('description',''\\)[:80]}\\\\\" for t in d['tools']\\)\\)\")"
     ]
   }
 }

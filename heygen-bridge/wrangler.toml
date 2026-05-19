@@ -1,0 +1,24 @@
+name = "canvas-heygen-bridge"
+main = "src/index.ts"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# KV namespaces are created via:
+#   wrangler kv namespace create HEYGEN_TOKENS
+#   wrangler kv namespace create HEYGEN_TOKENS --preview
+# Paste the returned ids below.
+[[kv_namespaces]]
+binding = "HEYGEN_TOKENS"
+id = "9bbba6bb6a784cb5956701658fe1cafb"
+preview_id = "efe98f753b134d6b88e0a281a8bd9820"
+
+# Public-ish config. Secrets (CANVAS_INTERNAL_TOKEN, QSTASH_*, etc.) are set via
+#   wrangler secret put <NAME>
+[vars]
+HEYGEN_MCP_BASE = "https://mcp.heygen.com/mcp/v1/"
+HEYGEN_OAUTH_BASE = "https://api2.heygen.com/v1/oauth"
+HEYGEN_OAUTH_REGISTRATION_ENDPOINT = "https://api2.heygen.com/v1/oauth/register"
+HEYGEN_OAUTH_AUTHORIZE_ENDPOINT = "https://api2.heygen.com/v1/oauth/authorize"
+HEYGEN_OAUTH_TOKEN_ENDPOINT = "https://api2.heygen.com/v1/oauth/token"
+# Canvas app origin allowed to call this bridge (used in CORS + post-OAuth redirect).
+CANVAS_APP_ORIGIN = "https://canvas.bhskin.co.id"

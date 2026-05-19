@@ -8,6 +8,7 @@ export type NodeType =
   | "image_generate"
   | "image_upload"
   | "video_generate"
+  | "heygen_generate"
   | "storyboard"
   | "scene_composer"
   | "export"
@@ -69,6 +70,23 @@ export type VideoGenerateParams = {
 
 export type ExportParams = {
   filename?: string;
+};
+
+export type HeygenGenerateParams = {
+  /**
+   * `avatar` → uses a pre-made HeyGen avatar (avatarId) via
+   *   `create_video_from_avatar`.
+   * `image`  → animates an upstream image (image_generate / image_upload) via
+   *   `create_video_from_image`. No avatar dropdown; image comes from edge.
+   */
+  mode: "avatar" | "image";
+  script: string;
+  voiceId?: string;
+  voiceLabel?: string;
+  avatarId?: string;
+  avatarLabel?: string;
+  /** Returned by HeyGen on submit, used as the polling key in `generation_jobs.external_job_id`. */
+  heygenVideoId?: string;
 };
 
 export type TextPromptParams = {
@@ -189,6 +207,10 @@ export const DEFAULT_PARAMS: Record<NodeType, Record<string, unknown>> = {
     duration: 8, // VEO 3.1 Fast (default model) has fixed 8s duration
     audio: false,
   } satisfies VideoGenerateParams,
+  heygen_generate: {
+    mode: "avatar",
+    script: "",
+  } satisfies HeygenGenerateParams,
   export: {} satisfies ExportParams,
   text_prompt: {
     text: "",

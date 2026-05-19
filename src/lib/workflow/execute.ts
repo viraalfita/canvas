@@ -523,8 +523,10 @@ export async function runWorkflow(
   ctx: WorkflowContext,
   opts: { sequential?: boolean } = {},
 ) {
-  // Reset previously-finished nodes so they can re-run. Skip `image_upload`
-  // because their output is user-provided, not generated.
+  // Reset only `failed` nodes so a Run-all retries them. Successful nodes
+  // keep their output — re-running the whole graph shouldn't burn tokens
+  // regenerating work that's already done. Skip `image_upload` because their
+  // output is user-provided, not generated.
   await ctx.supabase
     .from("nodes")
     .update({
@@ -535,7 +537,7 @@ export async function runWorkflow(
       usage: null,
     })
     .eq("workflow_id", ctx.workflowId)
-    .in("status", ["failed", "success"])
+    .eq("status", "failed")
     .neq("type", "image_upload");
   await dispatchReadyNodes(ctx, { sequential: opts.sequential });
 }

@@ -66,7 +66,7 @@ export function ExportNode({ data, selected }: NodeProps) {
             Connect an image or video output here.
           </p>
         )}
-        <UsageBadge usage={d.usage} />
+        <UsageBadge usage={d.usage} status={d.status} />
       </NodeShell>
       <MediaLightbox output={zoom} onClose={() => setZoom(null)} />
     </>

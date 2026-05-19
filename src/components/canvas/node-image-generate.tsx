@@ -32,6 +32,9 @@ export function ImageGenerateNode({ data, selected }: NodeProps) {
   const model = findModel(currentModelId);
   const [imgError, setImgError] = useState<string | null>(null);
   const [zoom, setZoom] = useState<NodeOutput | null>(null);
+  const [showEnhanced, setShowEnhanced] = useState<boolean>(
+    Boolean(params.enhancedPrompt),
+  );
 
   function onModelChange(newModelId: ImageModelId) {
     const fixed = coerceParamsForModel(newModelId, {
@@ -85,6 +88,7 @@ export function ImageGenerateNode({ data, selected }: NodeProps) {
             {IMAGE_MODELS.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.label} — {m.vendor}
+                {m.priceHint ? ` · ${m.priceHint}` : ""}
                 {m.hint ? ` (${m.hint})` : ""}
               </option>
             ))}
@@ -98,9 +102,10 @@ export function ImageGenerateNode({ data, selected }: NodeProps) {
             <EnhancePromptButton
               idea={params.prompt ?? ""}
               kind="image"
-              onResult={(enhancedPrompt) =>
-                commitNodeParams(id, { ...params, enhancedPrompt })
-              }
+              onResult={(enhancedPrompt) => {
+                commitNodeParams(id, { ...params, enhancedPrompt });
+                setShowEnhanced(true);
+              }}
             />
           </div>
           <textarea
@@ -113,20 +118,39 @@ export function ImageGenerateNode({ data, selected }: NodeProps) {
             className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
           />
         </label>
-        <label className="block">
-          <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
-            Enhanced prompt {params.enhancedPrompt ? "(used)" : "(optional)"}
-          </span>
-          <textarea
-            value={params.enhancedPrompt ?? ""}
-            onChange={(e) =>
-              commitNodeParams(id, { ...params, enhancedPrompt: e.target.value })
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowEnhanced((v) => !v)}
+            title={
+              showEnhanced
+                ? "Hide enhanced prompt"
+                : params.enhancedPrompt
+                  ? "Show enhanced prompt (used at run)"
+                  : "Show enhanced prompt"
             }
-            placeholder="click ✨ Enhance to generate detailed English prompt here"
-            rows={4}
-            className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
-          />
-        </label>
+            className="flex w-full items-center justify-end gap-1 text-[10px] text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
+          >
+            {params.enhancedPrompt && !showEnhanced && (
+              <span aria-hidden>✨</span>
+            )}
+            <span aria-hidden>{showEnhanced ? "▴" : "▾"}</span>
+          </button>
+          {showEnhanced && (
+            <textarea
+              value={params.enhancedPrompt ?? ""}
+              onChange={(e) =>
+                commitNodeParams(id, {
+                  ...params,
+                  enhancedPrompt: e.target.value,
+                })
+              }
+              placeholder="click ✨ Enhance to generate detailed English prompt here"
+              rows={4}
+              className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
+            />
+          )}
+        </div>
         <div
           className={`grid gap-2 ${model.resolutions ? "grid-cols-2" : "grid-cols-1"}`}
         >
@@ -188,7 +212,7 @@ export function ImageGenerateNode({ data, selected }: NodeProps) {
             <DownloadButton output={d.output} prefix="image" />
           </>
         )}
-        <UsageBadge usage={d.usage} />
+        <UsageBadge usage={d.usage} status={d.status} />
         <OutputHistory
           nodeId={id}
           nodeType="image_generate"

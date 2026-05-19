@@ -33,6 +33,11 @@ export type VideoModel = {
   label: string;
   vendor: string;
   hint?: string;
+  /** Short pricing label shown in the dropdown, e.g. "$0.40/s" or
+   *  "$0.20–0.50/s". Free-form so we can express tiered pricing. Source the
+   *  number from your APImart dashboard or vendor docs; leave undefined when
+   *  unknown. */
+  priceHint?: string;
   /** Valid aspect ratio values; null when the model doesn't accept that field. */
   aspectRatios: string[] | null;
   /** Valid resolution display strings (e.g. "720p"). null = field not used. */
@@ -65,6 +70,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "Seedance 1.5 Pro",
     vendor: "Doubao",
     hint: "cheap default, T2V + first/last frame, audio",
+    priceHint: "$0.020/s",
     aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"],
     resolutions: ["480p", "720p", "1080p"],
     durations: [4, 5, 6, 8, 10, 12],
@@ -78,6 +84,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "Seedance 2.0",
     vendor: "Doubao",
     hint: "9 image refs, audio, video continuation",
+    priceHint: "$0.073/s",
     aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive"],
     resolutions: ["480p", "720p", "1080p"],
     durations: [4, 5, 6, 8, 10, 12, 15],
@@ -110,6 +117,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "Wan 2.6",
     vendor: "Alibaba",
     hint: "audio support, special-effect templates",
+    priceHint: "$0.050/s",
     aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4"],
     resolutions: ["720p", "1080p"],
     durations: [5, 10, 15],
@@ -123,6 +131,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "Wan 2.7",
     vendor: "Alibaba",
     hint: "newer, audio_url, video continuation",
+    priceHint: "$0.066/s",
     aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4"],
     resolutions: ["720p", "1080p"],
     durations: [3, 5, 8, 10, 15],
@@ -140,6 +149,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "MiniMax Hailuo 2.3",
     vendor: "MiniMax",
     hint: "cinematic, 15 camera-movement commands",
+    priceHint: "$0.049/s",
     aspectRatios: null,
     resolutions: ["768p", "1080p"],
     durations: [6, 10],
@@ -168,6 +178,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "MiniMax Hailuo 02",
     vendor: "MiniMax",
     hint: "older, has 512p option",
+    priceHint: "$0.080/s",
     aspectRatios: null,
     resolutions: ["512p", "768p", "1080p"],
     durations: [5, 10],
@@ -184,6 +195,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "Kling v2.6",
     vendor: "Kuaishou",
     hint: "popular, std=720P / pro=1080P",
+    priceHint: "$0.037/s",
     aspectRatios: ["16:9", "9:16", "1:1"],
     resolutions: ["720p", "1080p"],
     durations: [5, 10],
@@ -199,6 +211,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "Kling v3",
     vendor: "Kuaishou",
     hint: "multi-shot, audio, supports 4K",
+    priceHint: "$0.067/s",
     aspectRatios: ["16:9", "9:16", "1:1"],
     resolutions: ["720p", "1080p", "4k"],
     durations: [3, 5, 8, 10, 15],
@@ -216,6 +229,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "VEO 3.1 Fast",
     vendor: "Google",
     hint: "fast, fixed 8s, up to 4K",
+    priceHint: "$0.080/gen",
     aspectRatios: ["16:9", "9:16"],
     resolutions: ["720p", "1080p", "4k"],
     durations: [8],
@@ -244,6 +258,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "Vidu Q3 Pro",
     vendor: "Vidu",
     hint: "audio default on, 1-16s",
+    priceHint: "$0.080/s",
     aspectRatios: ["16:9", "9:16", "4:3", "3:4", "1:1"],
     resolutions: ["540p", "720p", "1080p"],
     durations: [3, 5, 8, 10, 15, 16],
@@ -286,6 +301,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "SkyReels V4 Fast",
     vendor: "SkyReels",
     hint: "faster SkyReels",
+    priceHint: "$0.064/s",
     aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4"],
     resolutions: ["480p", "720p", "1080p"],
     durations: [3, 5, 8, 10, 15],
@@ -302,6 +318,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "Grok Imagine 1.0",
     vendor: "xAI",
     hint: "up to 7 image refs, 6-30s, 480p/720p",
+    priceHint: "$0.007/s",
     aspectRatios: ["16:9", "9:16", "1:1", "3:2", "2:3"],
     resolutions: ["480p", "720p"],
     durations: [6, 10, 15, 20, 30],
@@ -319,6 +336,7 @@ export const VIDEO_MODELS: VideoModel[] = [
     label: "Sora 2 Pro",
     vendor: "OpenAI",
     hint: "premium, 10/15/25s, 24h URL (we mirror)",
+    priceHint: "$0.600/s",
     aspectRatios: ["16:9", "9:16"],
     resolutions: null,
     durations: [10, 15, 25],

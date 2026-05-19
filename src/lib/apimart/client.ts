@@ -175,11 +175,13 @@ export type ApimartBalance = {
   success: boolean;
   remain_balance: number;
   used_balance: number;
-  unlimited_quota: boolean;
+  /** Older endpoint exposed this; `/user/balance` doesn't return it, so treat
+   *  as optional. The UI falls back to showing numeric remain/used when absent. */
+  unlimited_quota?: boolean;
 };
 
 export async function getBalance() {
-  return request<ApimartBalance>("/balance");
+  return request<ApimartBalance>("/user/balance");
 }
 
 export async function getTask(taskId: string) {

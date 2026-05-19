@@ -23,6 +23,11 @@ export type ImageModel = {
   label: string;
   vendor: string;
   hint?: string;
+  /** Short pricing label shown in the dropdown, e.g. "$0.04/img" or
+   *  "$0.04–0.18/img". Free-form so we can express tiered pricing. Source the
+   *  number from your APImart dashboard or vendor docs; leave undefined when
+   *  unknown. */
+  priceHint?: string;
   /** Valid `size` values to send. Always include the model's default first. */
   aspectRatios: string[];
   /**
@@ -44,6 +49,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     label: "Seedream 5.0 Lite",
     vendor: "Doubao",
     hint: "fast & cheap default",
+    priceHint: "$0.028/pic",
     aspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9", "auto"],
     resolutions: ["2K", "3K"],
     supportsImageUrls: true,
@@ -54,6 +60,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     label: "Seedream 4.5",
     vendor: "Doubao",
     hint: "supports edit + 10 reference images",
+    priceHint: "$0.028/pic",
     aspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9", "9:21", "auto"],
     resolutions: ["2K", "4K"],
     supportsImageUrls: true,
@@ -63,6 +70,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     id: "doubao-seedream-4-0",
     label: "Seedream 4.0",
     vendor: "Doubao",
+    priceHint: "$0.022/pic",
     aspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9", "9:21", "auto"],
     resolutions: ["1K", "2K", "4K"],
     supportsImageUrls: true,
@@ -73,6 +81,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     label: "GPT-Image 2",
     vendor: "OpenAI",
     hint: "13 aspect ratios, 1K/2K/4K",
+    priceHint: "$0.006/pic",
     aspectRatios: [
       "1:1", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5",
       "16:9", "9:16", "2:1", "1:2", "21:9", "9:21", "auto",
@@ -87,6 +96,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     label: "Gemini 2.5 Flash Image",
     vendor: "Google",
     hint: "fast",
+    priceHint: "$0.013/pic",
     aspectRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
     resolutions: ["1K"],
     supportsImageUrls: true,
@@ -97,6 +107,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     label: "Gemini 3 Pro Image",
     vendor: "Google",
     hint: "high quality",
+    priceHint: "$0.040/pic",
     aspectRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
     resolutions: ["1K", "2K", "4K"],
     supportsImageUrls: true,
@@ -107,6 +118,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     label: "Imagen 4.0",
     vendor: "Google",
     hint: "text-to-image only",
+    priceHint: "$0.040/pic",
     aspectRatios: ["16:9", "1:1", "4:3", "3:4", "9:16"],
     resolutions: null,
     supportsImageUrls: false,
@@ -117,6 +129,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     label: "Qwen Image 2.0",
     vendor: "Alibaba",
     hint: "up to 6 images",
+    priceHint: "$0.020/pic",
     aspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3"],
     resolutions: ["1K", "2K"],
     supportsImageUrls: true,
@@ -127,6 +140,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     label: "Z-Image Turbo",
     vendor: "Z.ai",
     hint: "lightweight, T2I only",
+    priceHint: "$0.010/pic",
     aspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3"],
     resolutions: ["1K", "2K"],
     supportsImageUrls: false,

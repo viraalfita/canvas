@@ -6,15 +6,10 @@ import {
 } from "@/lib/apimart/client";
 import { DEFAULT_IMAGE_MODEL } from "@/lib/apimart/models";
 import { DEFAULT_VIDEO_MODEL } from "@/lib/apimart/video-models";
-import {
-  getVideoStatus as getHeygenVideoStatus,
-  submitVideo as submitHeygenVideo,
-} from "@/lib/heygen/client";
 import { persistRemoteUrl } from "@/lib/storage";
 import type {
   CanvasEdgeRow,
   CanvasNodeRow,
-  HeygenGenerateParams,
   ImageGenerateParams,
   NodeOutput,
   NodeUsage,
@@ -226,104 +221,6 @@ async function submitVideoNode(
   }
 }
 
-/** Submit a heygen_generate node to the HeyGen bridge.
- *  Unlike APImart, HeyGen jobs are tracked via the dedicated `generation_jobs`
- *  table (provider+external_job_id) instead of `nodes.apimart_task_id` — they
- *  live in a separate provider namespace and shouldn't collide. */
-async function submitHeygenNode(
-  ctx: WorkflowContext,
-  node: CanvasNodeRow,
-  upstreamImageUrl: string | null,
-) {
-  const params = node.params as HeygenGenerateParams;
-  const mode = params.mode ?? "avatar";
-  const script = params.script?.trim();
-  if (!script) {
-    await setNode(ctx, node.id, {
-      status: "failed",
-      error: "Script is required",
-    });
-    return;
-  }
-  if (!params.voiceId) {
-    await setNode(ctx, node.id, {
-      status: "failed",
-      error: "Voice is required",
-    });
-    return;
-  }
-  if (mode === "avatar" && !params.avatarId) {
-    await setNode(ctx, node.id, {
-      status: "failed",
-      error: "Avatar is required",
-    });
-    return;
-  }
-  if (mode === "image" && !upstreamImageUrl) {
-    await setNode(ctx, node.id, {
-      status: "failed",
-      error: "Connect an upstream image (Image Generate or Image Upload).",
-    });
-    return;
-  }
-
-  // Cancel any in-flight jobs for this node before re-submitting, otherwise
-  // the polling loop would observe the OLD external_job_id and overwrite
-  // node.output with stale data.
-  await ctx.supabase
-    .from("generation_jobs")
-    .update({
-      status: "cancelled",
-      completed_at: new Date().toISOString(),
-    })
-    .eq("node_id", node.id)
-    .in("status", ["queued", "running"]);
-
-  try {
-    const { external_job_id } =
-      mode === "image"
-        ? await submitHeygenVideo({
-            mode: "image",
-            script,
-            voice_id: params.voiceId,
-            image_url: upstreamImageUrl as string,
-          })
-        : await submitHeygenVideo({
-            mode: "avatar",
-            script,
-            voice_id: params.voiceId,
-            avatar_id: params.avatarId as string,
-          });
-    await ctx.supabase.from("generation_jobs").insert({
-      node_id: node.id,
-      workflow_id: ctx.workflowId,
-      provider: "heygen",
-      external_job_id,
-      status: "running",
-      created_by: ctx.userId,
-      started_at: new Date().toISOString(),
-      metadata: {
-        mode,
-        voiceLabel: params.voiceLabel,
-        avatarLabel: params.avatarLabel,
-        imageUrl: upstreamImageUrl,
-        script,
-      },
-    });
-    await setNode(ctx, node.id, {
-      status: "running",
-      apimart_task_id: null,
-      error: null,
-      usage: { model: "heygen" } satisfies NodeUsage,
-    });
-  } catch (e) {
-    await setNode(ctx, node.id, {
-      status: "failed",
-      error: e instanceof Error ? e.message : String(e),
-    });
-  }
-}
-
 /** "Resolve" an export node: mirror its single upstream output + usage. */
 async function resolveExportNode(
   ctx: WorkflowContext,
@@ -451,10 +348,6 @@ async function dispatchSingle(
       upstreamImages,
       withTextPrefix<VideoGenerateParams>(),
     );
-  } else if (t === "heygen_generate") {
-    const upstreamImage =
-      upstream.outputs.find((o) => o.kind === "image")?.url ?? null;
-    await submitHeygenNode(ctx, node, upstreamImage);
   } else if (t === "export") {
     await resolveExportNode(
       ctx,
@@ -647,107 +540,6 @@ export async function runWorkflow(
   await dispatchReadyNodes(ctx, { sequential: opts.sequential });
 }
 
-/** Poll the HeyGen bridge for any open `generation_jobs` rows. On success,
- *  mirror the remote URL to Supabase Storage (HeyGen URLs may expire) and
- *  fan the result back to the node. */
-async function pollHeygenJobs(ctx: WorkflowContext) {
-  const { data: jobs, error } = await ctx.supabase
-    .from("generation_jobs")
-    .select("*")
-    .eq("workflow_id", ctx.workflowId)
-    .eq("provider", "heygen")
-    .in("status", ["queued", "running"]);
-  if (error) throw new Error(error.message);
-
-  for (const job of (jobs ?? []) as Array<{
-    id: string;
-    node_id: string;
-    external_job_id: string | null;
-    status: string;
-    metadata: Record<string, unknown> | null;
-  }>) {
-    if (!job.external_job_id) continue;
-    try {
-      const status = await getHeygenVideoStatus(job.external_job_id);
-
-      if (status.status === "success") {
-        if (!status.video_url) {
-          await ctx.supabase
-            .from("generation_jobs")
-            .update({
-              status: "failed",
-              error: "Completed but no video_url",
-              completed_at: new Date().toISOString(),
-            })
-            .eq("id", job.id);
-          await setNode(ctx, job.node_id, {
-            status: "failed",
-            error: "Completed but no video_url",
-          });
-          continue;
-        }
-
-        // Atomic claim — flip status running→success only if nobody else has.
-        const { data: claimed } = await ctx.supabase
-          .from("generation_jobs")
-          .update({
-            status: "success",
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", job.id)
-          .eq("status", job.status)
-          .select("id")
-          .maybeSingle();
-        if (!claimed) continue;
-
-        const stored = await persistRemoteUrl({
-          userId: ctx.userId,
-          workflowId: ctx.workflowId,
-          nodeId: job.node_id,
-          url: status.video_url,
-          ext: "mp4",
-        });
-        const output: NodeOutput = {
-          kind: "video",
-          url: stored.url,
-          mimeType: stored.contentType,
-          thumbnailUrl: status.thumbnail_url,
-        };
-        const usage: NodeUsage = {
-          model: "heygen",
-          completedAt: Date.now(),
-          actualTime: status.duration_seconds,
-        };
-        await setNode(ctx, job.node_id, {
-          status: "success",
-          output,
-          error: null,
-          usage,
-        });
-        await recordHistory(ctx, job.node_id, output, usage);
-      } else if (status.status === "failed") {
-        await ctx.supabase
-          .from("generation_jobs")
-          .update({
-            status: "failed",
-            error: status.error ?? "HeyGen reported failure",
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", job.id);
-        await setNode(ctx, job.node_id, {
-          status: "failed",
-          error: status.error ?? "HeyGen reported failure",
-        });
-      }
-      // queued/running: nothing to do — next tick will re-check.
-    } catch (e) {
-      // Transient network/auth blips shouldn't immediately fail the node —
-      // they're usually recoverable on the next tick. Just log.
-      console.error("pollHeygenJobs failed for job", job.id, e);
-    }
-  }
-}
-
 export async function tickWorkflow(
   ctx: WorkflowContext,
   opts: {
@@ -762,7 +554,6 @@ export async function tickWorkflow(
   } = {},
 ) {
   await pollRunningNodes(ctx);
-  await pollHeygenJobs(ctx);
   if (opts.cascade !== false) {
     await dispatchReadyNodes(ctx, { sequential: opts.sequential });
   }

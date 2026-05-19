@@ -51,7 +51,6 @@ import { StoryboardNode } from "./node-storyboard";
 import { SceneComposerNode } from "./node-scene-composer";
 import { ExportNode } from "./node-export";
 import { TextPromptNode } from "./node-text-prompt";
-import { HeygenGenerateNode } from "./node-heygen-generate";
 import { CanvasDock } from "./canvas-dock";
 import { CanvasSidebar } from "./canvas-sidebar";
 import { CanvasToolbar } from "./canvas-toolbar";
@@ -66,7 +65,6 @@ const nodeTypes = {
   image_merge: ImageGenerateNode,
   image_upload: ImageUploadNode,
   video_generate: VideoGenerateNode,
-  heygen_generate: HeygenGenerateNode,
   storyboard: StoryboardNode,
   scene_composer: SceneComposerNode,
   export: ExportNode,

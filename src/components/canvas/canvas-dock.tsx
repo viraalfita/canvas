@@ -8,7 +8,6 @@ import {
   ClapperboardIcon,
   FilmIcon,
   TypeIcon,
-  // UserSquareIcon, // re-enable when HeyGen unhidden
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NodeType } from "@/lib/canvas/types";
@@ -26,8 +25,6 @@ const ITEMS: DockItem[] = [
   { type: "storyboard", label: "Storyboard", icon: ClapperboardIcon, group: "ai" },
   { type: "image_generate", label: "Image", icon: ImageIcon, group: "ai" },
   { type: "video_generate", label: "Video", icon: VideoIcon, group: "ai" },
-  // HeyGen hidden — menunggu strategi credit (lihat memory project_heygen_integration).
-  // { type: "heygen_generate", label: "HeyGen Avatar", icon: UserSquareIcon, group: "ai" },
   { type: "scene_composer", label: "Scene Composer", icon: FilmIcon, group: "compose" },
   { type: "export", label: "Export", icon: DownloadIcon, group: "output" },
 ];

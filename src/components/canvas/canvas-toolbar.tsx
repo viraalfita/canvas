@@ -15,8 +15,6 @@ import {
   LayoutPanelTopIcon,
 } from "lucide-react";
 import { BalanceIndicator } from "./balance-indicator";
-// HeyGen hidden — re-enable when HeyGen unhidden.
-// import { HeygenCreditsIndicator } from "./heygen-credits-indicator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useNavMode } from "@/lib/canvas/use-nav-mode";
@@ -135,7 +133,6 @@ export function CanvasToolbar({
       </div>
       <div className="flex items-center gap-2">
         <BalanceIndicator refreshKey={pollCompletionTick} />
-        {/* <HeygenCreditsIndicator refreshKey={pollCompletionTick} /> */}
         {isPolling && (
           <span className="flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400">
             <Loader2Icon className="h-3 w-3 animate-spin" />

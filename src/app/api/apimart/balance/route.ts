@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getBalance } from "@/lib/apimart/client";
+import { apimartUserMessage, getBalance } from "@/lib/apimart/client";
 
 export async function GET() {
   const supabase = await createClient();
@@ -17,8 +17,9 @@ export async function GET() {
       unlimited: res.unlimited_quota,
     });
   } catch (e) {
+    console.error("apimart balance fetch failed", e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : String(e) },
+      { error: apimartUserMessage(e, "Could not reach the provider to check balance.") },
       { status: 502 },
     );
   }

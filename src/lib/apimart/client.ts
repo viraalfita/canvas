@@ -40,6 +40,52 @@ export type ApimartTaskResponse = {
   };
 };
 
+/** Error carrying APImart's raw failure detail. The detail is for logs/mapping
+ *  only — never render it directly in the UI. Use `apimartUserMessage()` to get
+ *  a safe, short message for users. */
+export class ApimartError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly detail: string,
+  ) {
+    super(`APImart request failed: ${status} ${detail}`);
+    this.name = "ApimartError";
+  }
+}
+
+/**
+ * Map any APImart failure — a thrown `ApimartError`, a generic Error, or a
+ * task's `{ code, message, type }` error payload — to a short, user-safe
+ * message. Never leaks raw API responses, status codes, endpoint paths, or
+ * stack traces to the UI.
+ */
+export function apimartUserMessage(
+  input: unknown,
+  fallback = "The provider failed to run this generation. Please try again.",
+): string {
+  const raw =
+    input instanceof ApimartError
+      ? input.detail
+      : input instanceof Error
+        ? input.message
+        : typeof input === "object" && input !== null && "message" in input
+          ? String((input as { message: unknown }).message)
+          : String(input ?? "");
+  const text = raw.toLowerCase();
+
+  if (/insufficient|balance|quota|credit|not enough|payment/.test(text))
+    return "Provider balance is insufficient to run this generation.";
+  if (/moderat|policy|content|sensitive|nsfw|safety|blocked|reject|violat|prohibit/.test(text))
+    return "The provider rejected this request — the prompt or image may violate its content policy.";
+  if (/rate.?limit|too many|overload|busy|throttl|\b429\b/.test(text))
+    return "The provider is busy right now. Please wait a moment and try again.";
+  if (/timeout|timed out|deadline/.test(text))
+    return "The provider timed out. Please try again.";
+  if (/api.?key|unauthor|forbidden|authentic|\b401\b|\b403\b/.test(text))
+    return "Provider authentication failed. Please check the API configuration.";
+  return fallback;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${APIMART_BASE}${path}`, {
     ...init,
@@ -52,9 +98,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const json = (await res.json()) as { code: number; data?: unknown; message?: string };
   if (!res.ok || (json.code && json.code >= 400)) {
-    throw new Error(
-      `APImart ${path} failed: ${res.status} ${json.message ?? JSON.stringify(json)}`,
-    );
+    // Keep the full detail on the error object for server logs; the UI layer
+    // converts it to a safe message via `apimartUserMessage()`.
+    throw new ApimartError(res.status, json.message ?? JSON.stringify(json));
   }
   return json as T;
 }

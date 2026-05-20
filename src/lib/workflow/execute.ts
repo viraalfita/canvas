@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  apimartUserMessage,
   getTask,
   submitImageGenerate,
   submitVideoGenerate,
@@ -160,9 +161,10 @@ async function submitImageNode(
       usage: { model } satisfies NodeUsage,
     });
   } catch (e) {
+    console.error("apimart generation failed", e);
     await setNode(ctx, node.id, {
       status: "failed",
-      error: e instanceof Error ? e.message : String(e),
+      error: apimartUserMessage(e),
     });
   }
 }
@@ -214,9 +216,10 @@ async function submitVideoNode(
       usage: { model } satisfies NodeUsage,
     });
   } catch (e) {
+    console.error("apimart generation failed", e);
     await setNode(ctx, node.id, {
       status: "failed",
-      error: e instanceof Error ? e.message : String(e),
+      error: apimartUserMessage(e),
     });
   }
 }
@@ -429,7 +432,7 @@ async function pollRunningNodes(ctx: WorkflowContext) {
         if (!remoteUrl) {
           await setNode(ctx, node.id, {
             status: "failed",
-            error: "Completed task has no output URL",
+            error: "The provider returned no output. Please try again.",
           });
           continue;
         }
@@ -487,7 +490,11 @@ async function pollRunningNodes(ctx: WorkflowContext) {
       } else if (status === "failed" || status === "cancelled") {
         await setNode(ctx, node.id, {
           status: "failed",
-          error: res.data.error?.message ?? `Task ${status}`,
+          error: res.data.error
+            ? apimartUserMessage(res.data.error)
+            : status === "cancelled"
+              ? "The generation was cancelled by the provider."
+              : "The provider failed to run this generation. Please try again.",
         });
       } else {
         // Still running — surface progress + ETA on the node so the UI can

@@ -71,18 +71,44 @@ export function apimartUserMessage(
         : typeof input === "object" && input !== null && "message" in input
           ? String((input as { message: unknown }).message)
           : String(input ?? "");
+  // Pull a numeric HTTP/error code when present — the poll-path error payload
+  // carries `code` separately from the message (so the message alone may not
+  // contain "429"), and ApimartError exposes the HTTP status.
+  let code: number | undefined;
+  if (input instanceof ApimartError) {
+    code = input.status;
+  } else if (typeof input === "object" && input !== null) {
+    const o = input as { code?: unknown; status?: unknown };
+    if (typeof o.code === "number") code = o.code;
+    else if (typeof o.status === "number") code = o.status;
+  }
   const text = raw.toLowerCase();
 
-  if (/insufficient|balance|quota|credit|not enough|payment/.test(text))
+  // Rate limit / throttling FIRST. Google-style throttle messages read
+  // "Resource has been exhausted (e.g. check quota)" — the word "quota" there
+  // is about request rate, not billing, so this must win over the balance
+  // check below (otherwise it's misreported as "insufficient balance").
+  if (
+    code === 429 ||
+    /rate.?limit|too many|over\s?load|busy|throttl|resource[\s_]?exhausted|exhausted|\b429\b/.test(
+      text,
+    )
+  )
+    return "The provider is busy or rate-limited right now. Please wait a moment and try again.";
+  if (
+    code === 401 ||
+    code === 403 ||
+    /api.?key|unauthor|forbidden|authentic|\b401\b|\b403\b/.test(text)
+  )
+    return "Provider authentication failed. Please check the API configuration.";
+  // Billing only — note "quota" is intentionally excluded (it's ambiguous with
+  // rate-limit messages, which are handled above).
+  if (/insufficient|\bbalance\b|credit|not enough|payment|billing|top.?up/.test(text))
     return "Provider balance is insufficient to run this generation.";
   if (/moderat|policy|content|sensitive|nsfw|safety|blocked|reject|violat|prohibit/.test(text))
     return "The provider rejected this request — the prompt or image may violate its content policy.";
-  if (/rate.?limit|too many|overload|busy|throttl|\b429\b/.test(text))
-    return "The provider is busy right now. Please wait a moment and try again.";
   if (/timeout|timed out|deadline/.test(text))
     return "The provider timed out. Please try again.";
-  if (/api.?key|unauthor|forbidden|authentic|\b401\b|\b403\b/.test(text))
-    return "Provider authentication failed. Please check the API configuration.";
   return fallback;
 }
 
@@ -160,6 +186,13 @@ export type VideoGenerateInput = {
   duration?: number;
   imageUrls?: string[];
   audio?: boolean;
+  /** How image inputs are used (Veo3): "frame" or "reference". Only sent when
+   *  the model declares `generationTypes` and image inputs are present. */
+  generationType?: "frame" | "reference";
+  /** Explicit end/last frame image. Appended as the final image in the list so
+   *  it lands in the "end frame" slot; forces `generation_type: "frame"` on
+   *  models that support it. */
+  endFrameUrl?: string;
 };
 
 export async function submitVideoGenerate(input: VideoGenerateInput) {
@@ -187,16 +220,30 @@ export async function submitVideoGenerate(input: VideoGenerateInput) {
     body[resFieldName] = apiVal;
   }
 
-  if (
-    meta.supportsImageUrls &&
-    input.imageUrls &&
-    input.imageUrls.length > 0
-  ) {
-    const imgs = input.imageUrls.slice(0, meta.maxImages);
-    if (meta.imageField === "first_frame_image") {
-      body.first_frame_image = imgs[0];
-    } else {
-      body.image_urls = imgs;
+  if (meta.supportsImageUrls) {
+    // Start-frame / reference images first, then the explicit end frame last so
+    // it occupies the "end frame" slot (image_urls[last]).
+    const ordered = [
+      ...(input.imageUrls ?? []),
+      ...(input.endFrameUrl ? [input.endFrameUrl] : []),
+    ];
+    const imgs = ordered.slice(0, meta.maxImages);
+    if (imgs.length > 0) {
+      if (meta.imageField === "first_frame_image") {
+        body.first_frame_image = imgs[0];
+      } else {
+        body.image_urls = imgs;
+      }
+      // An explicit end frame implies frame-to-video; otherwise honour the
+      // caller's pick. Only sent when the model declares `generationTypes`.
+      const effectiveType = input.endFrameUrl ? "frame" : input.generationType;
+      if (
+        meta.generationTypes &&
+        effectiveType &&
+        meta.generationTypes.includes(effectiveType)
+      ) {
+        body.generation_type = effectiveType;
+      }
     }
   }
 
@@ -214,6 +261,55 @@ export async function submitVideoGenerate(input: VideoGenerateInput) {
   });
   const taskId = res.data?.[0]?.task_id;
   if (!taskId) throw new Error("APImart did not return a video task_id");
+  return { taskId };
+}
+
+export type VideoRemixInput = {
+  /** task_id of the original video (must have completed successfully). */
+  sourceTaskId: string;
+  /** Must match the model used for the original video. */
+  model: VideoModelId;
+  /** Continuation prompt describing the extended portion. */
+  prompt: string;
+  aspectRatio?: string;
+  resolution?: string;
+  /** When true, return only the newly-extended portion (not the joined clip). */
+  raw?: boolean;
+};
+
+/**
+ * Extend a previously-generated video via `POST /videos/{task_id}/remix`
+ * (Veo3). Returns a new task_id polled through the same `/tasks/{id}` endpoint.
+ */
+export async function submitVideoRemix(input: VideoRemixInput) {
+  const meta = findVideoModel(input.model);
+  const coerced = coerceVideoParamsForModel(input.model, {
+    aspectRatio: input.aspectRatio,
+    resolution: input.resolution,
+    duration: meta.defaultDuration,
+  });
+
+  const body: Record<string, unknown> = {
+    model: input.model,
+    prompt: input.prompt,
+  };
+  if (input.raw !== undefined) body.raw = input.raw;
+  if (coerced.aspectRatio && meta.aspectRatios) {
+    body.aspect_ratio = coerced.aspectRatio;
+  }
+  if (coerced.resolution && meta.resolutions) {
+    body.resolution = meta.resolutionMap?.[coerced.resolution] ?? coerced.resolution;
+  }
+
+  const res = await request<{
+    code: number;
+    data: { status: string; task_id: string }[];
+  }>(`/videos/${encodeURIComponent(input.sourceTaskId)}/remix`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  const taskId = res.data?.[0]?.task_id;
+  if (!taskId) throw new Error("APImart did not return a remix task_id");
   return { taskId };
 }
 

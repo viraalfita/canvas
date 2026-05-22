@@ -61,6 +61,16 @@ export type VideoModel = {
   imageField?: "image_urls" | "first_frame_image";
   /** Field name for the audio toggle. Defaults to "audio". */
   audioField?: "audio" | "generate_audio";
+
+  /**
+   * Image-input modes this model supports via the `generation_type` field
+   * (Veo3 family). When set, the UI shows a Frame/Reference picker and the
+   * client sends `generation_type`. Omit for models that don't accept it.
+   */
+  generationTypes?: ("frame" | "reference")[];
+  /** Whether this model supports extending a finished video via the
+   *  `POST /videos/{task_id}/remix` endpoint (Veo3 family). */
+  supportsRemix?: boolean;
 };
 
 export const VIDEO_MODELS: VideoModel[] = [
@@ -237,6 +247,8 @@ export const VIDEO_MODELS: VideoModel[] = [
     supportsImageUrls: true,
     maxImages: 3,
     supportsAudio: false,
+    generationTypes: ["frame", "reference"],
+    supportsRemix: true,
   },
   {
     id: "veo3.1-quality",
@@ -250,6 +262,9 @@ export const VIDEO_MODELS: VideoModel[] = [
     supportsImageUrls: true,
     maxImages: 3,
     supportsAudio: false,
+    // quality variant does not support reference-image mode
+    generationTypes: ["frame"],
+    supportsRemix: true,
   },
 
   // --- Vidu Q3 ---

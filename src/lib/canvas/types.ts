@@ -31,6 +31,10 @@ export type NodeUsage = {
   completedAt?: number; // unix
   /** 0-100, populated by polling tick while task is in-progress. */
   progress?: number;
+  /** APImart task id of the completed generation. Persisted at completion (the
+   *  live `apimart_task_id` column is cleared once a video finishes) so a
+   *  downstream node can "remix"/extend this video by its task id. */
+  taskId?: string;
 };
 
 export type ImageGenerateParams = {
@@ -65,6 +69,21 @@ export type VideoGenerateParams = {
   duration: number;
   /** Whether to generate accompanying audio (only some models support this). */
   audio?: boolean;
+  /**
+   * "generate" (default) creates a brand-new video. "remix" extends the video
+   * produced by the connected upstream Video node (Veo3 only) — model & duration
+   * follow the source; image inputs are ignored.
+   */
+  mode?: "generate" | "remix";
+  /**
+   * How connected image inputs are used (Veo3 only). "frame": first image is
+   * the start frame, second is the end frame. "reference": images guide the
+   * look/subject. Ignored when there are no image inputs.
+   */
+  generationType?: "frame" | "reference";
+  /** Remix only: return just the newly-extended portion instead of the full
+   *  joined clip. */
+  remixRaw?: boolean;
 };
 
 export type ExportParams = {
@@ -188,6 +207,8 @@ export const DEFAULT_PARAMS: Record<NodeType, Record<string, unknown>> = {
     resolution: "720p",
     duration: 8, // VEO 3.1 Fast (default model) has fixed 8s duration
     audio: false,
+    mode: "generate",
+    generationType: "frame",
   } satisfies VideoGenerateParams,
   export: {} satisfies ExportParams,
   text_prompt: {

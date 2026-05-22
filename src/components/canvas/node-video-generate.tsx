@@ -38,7 +38,15 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
     Boolean(params.enhancedPrompt),
   );
 
+  const mode = params.mode ?? "generate";
+  const isRemix = mode === "remix";
+  const genTypes = model.generationTypes;
+  const genType = params.generationType ?? "frame";
+  // Models that accept frame-to-video expose a dedicated end-frame input dot.
+  const supportsEndFrame = !isRemix && Boolean(genTypes?.includes("frame"));
+
   function onModelChange(newModelId: VideoModelId) {
+    const next = findVideoModel(newModelId);
     const fixed = coerceVideoParamsForModel(newModelId, {
       aspectRatio: params.aspectRatio,
       resolution: params.resolution,
@@ -50,6 +58,12 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
       aspectRatio: fixed.aspectRatio,
       resolution: fixed.resolution,
       duration: fixed.duration,
+      // Drop remix if the new model can't do it; keep generationType valid.
+      mode: next.supportsRemix ? mode : "generate",
+      generationType:
+        next.generationTypes && next.generationTypes.includes(genType)
+          ? genType
+          : (next.generationTypes?.[0] ?? "frame"),
     });
   }
 
@@ -60,13 +74,26 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
         type="target"
         position={Position.Left}
         id="image_input"
+        title="Image input (start frame / reference)"
+        style={{ top: 44 }}
         className="h-3! w-3! bg-blue-500!"
       />
+      {supportsEndFrame && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="end_frame"
+          title="End frame (last frame)"
+          style={{ top: 76 }}
+          className="h-3! w-3! bg-emerald-500!"
+        />
+      )}
       <Handle
         type="target"
         position={Position.Left}
         id="text_input"
-        style={{ top: 64 }}
+        title="Text prompt input"
+        style={{ top: supportsEndFrame ? 108 : 76 }}
         className="h-3! w-3! bg-amber-400!"
       />
       <NodeShell
@@ -80,15 +107,19 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
         <NodeNameField nodeId={id} params={params} />
         <UpstreamRefs nodeId={id} />
         <p className="text-[10px] text-neutral-500">
-          Optional: connect 1+ images for image-to-video (max{" "}
-          {model.maxImages})
+          {isRemix
+            ? "Remix extends the connected upstream video (8s → 15s). Model & duration follow the source; image inputs are ignored."
+            : supportsEndFrame
+              ? `Connect images: 🔵 start frame · 🟢 end frame (optional) · 🟡 text (max ${model.maxImages})`
+              : `Optional: connect 1+ images for image-to-video (max ${model.maxImages})`}
         </p>
         <label className="block">
           <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">Model</span>
           <select
             value={currentModelId}
             onChange={(e) => onModelChange(e.target.value as VideoModelId)}
-            className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
+            disabled={isRemix}
+            className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none disabled:opacity-60"
           >
             {VIDEO_MODELS.map((m) => (
               <option key={m.id} value={m.id}>
@@ -99,6 +130,51 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
             ))}
           </select>
         </label>
+        {model.supportsRemix && (
+          <label className="block">
+            <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
+              Mode
+            </span>
+            <select
+              value={mode}
+              onChange={(e) =>
+                commitNodeParams(id, {
+                  ...params,
+                  mode: e.target.value as VideoGenerateParams["mode"],
+                })
+              }
+              className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
+            >
+              <option value="generate">Generate — new video</option>
+              <option value="remix">Remix — extend connected video</option>
+            </select>
+          </label>
+        )}
+        {!isRemix && genTypes && genTypes.length > 1 && (
+          <label className="block">
+            <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
+              Image use
+            </span>
+            <select
+              value={genType}
+              onChange={(e) =>
+                commitNodeParams(id, {
+                  ...params,
+                  generationType: e.target
+                    .value as VideoGenerateParams["generationType"],
+                })
+              }
+              className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
+            >
+              {genTypes.includes("frame") && (
+                <option value="frame">Frame — start / end frame</option>
+              )}
+              {genTypes.includes("reference") && (
+                <option value="reference">Reference — guide look/subject</option>
+              )}
+            </select>
+          </label>
+        )}
         <label className="block">
           <div className="flex items-center justify-between">
             <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
@@ -195,26 +271,40 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
               </select>
             </label>
           )}
-          <label className="block">
-            <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">Dur</span>
-            <select
-              value={params.duration ?? model.defaultDuration}
-              onChange={(e) =>
-                commitNodeParams(id, {
-                  ...params,
-                  duration: parseInt(e.target.value, 10),
-                })
-              }
-              className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
-            >
-              {model.durations.map((dur) => (
-                <option key={dur} value={dur}>
-                  {dur}s
-                </option>
-              ))}
-            </select>
-          </label>
+          {!isRemix && (
+            <label className="block">
+              <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">Dur</span>
+              <select
+                value={params.duration ?? model.defaultDuration}
+                onChange={(e) =>
+                  commitNodeParams(id, {
+                    ...params,
+                    duration: parseInt(e.target.value, 10),
+                  })
+                }
+                className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 px-2 py-1 text-xs outline-none"
+              >
+                {model.durations.map((dur) => (
+                  <option key={dur} value={dur}>
+                    {dur}s
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
+        {isRemix && (
+          <label className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
+            <input
+              type="checkbox"
+              checked={params.remixRaw ?? false}
+              onChange={(e) =>
+                commitNodeParams(id, { ...params, remixRaw: e.target.checked })
+              }
+            />
+            Only the extended part
+          </label>
+        )}
         {model.supportsAudio && (
           <label className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
             <input

@@ -4,7 +4,9 @@ import {
   getTask,
   submitImageGenerate,
   submitVideoGenerate,
+  submitVideoRemix,
 } from "@/lib/apimart/client";
+import { findVideoModel } from "@/lib/apimart/video-models";
 import { DEFAULT_IMAGE_MODEL } from "@/lib/apimart/models";
 import { DEFAULT_VIDEO_MODEL } from "@/lib/apimart/video-models";
 import { persistRemoteUrl } from "@/lib/storage";
@@ -169,12 +171,16 @@ async function submitImageNode(
   }
 }
 
-/** Submit a video_generate node to APImart. */
+/** Submit a video_generate node to APImart.
+ *  `videoSource` is the upstream node whose finished video this node extends
+ *  when running in "remix" mode. */
 async function submitVideoNode(
   ctx: WorkflowContext,
   node: CanvasNodeRow,
   upstreamImageUrls: string[],
   overrideParams?: Partial<VideoGenerateParams>,
+  videoSource?: CanvasNodeRow,
+  endFrameUrl?: string,
 ) {
   const merged = {
     ...(node.params as Partial<VideoGenerateParams>),
@@ -183,12 +189,6 @@ async function submitVideoNode(
     _extractedFrameUrl?: string;
   };
 
-  // If a previous tick extracted the last frame from an upstream Video, use
-  // it as the FIRST image input — it represents this scene's starting frame
-  // and gives visual continuity with the previous scene.
-  const finalImageUrls = merged._extractedFrameUrl
-    ? [merged._extractedFrameUrl, ...upstreamImageUrls]
-    : upstreamImageUrls;
   const effectivePrompt =
     merged.enhancedPrompt?.trim() || merged.prompt?.trim() || "";
   if (!effectivePrompt) {
@@ -198,6 +198,69 @@ async function submitVideoNode(
     });
     return;
   }
+
+  // --- Remix mode: extend the connected upstream video by its task id ---
+  if (merged.mode === "remix") {
+    const sourceUsage = (videoSource?.usage ?? null) as NodeUsage | null;
+    const sourceTaskId = sourceUsage?.taskId;
+    if (!videoSource) {
+      await setNode(ctx, node.id, {
+        status: "failed",
+        error: "Connect a generated video to this node to remix it.",
+      });
+      return;
+    }
+    if (!sourceTaskId) {
+      await setNode(ctx, node.id, {
+        status: "failed",
+        error:
+          "The source video can't be remixed (it was made before remix was supported). Regenerate it first.",
+      });
+      return;
+    }
+    // Remix requires the same model as the original video.
+    const model = (sourceUsage?.model as VideoGenerateParams["model"]) ??
+      merged.model ??
+      DEFAULT_VIDEO_MODEL;
+    if (!findVideoModel(model).supportsRemix) {
+      await setNode(ctx, node.id, {
+        status: "failed",
+        error: "The source video's model does not support remix.",
+      });
+      return;
+    }
+    try {
+      const { taskId } = await submitVideoRemix({
+        sourceTaskId,
+        model,
+        prompt: effectivePrompt,
+        aspectRatio: merged.aspectRatio,
+        resolution: merged.resolution,
+        raw: merged.remixRaw,
+      });
+      await setNode(ctx, node.id, {
+        status: "running",
+        apimart_task_id: taskId,
+        error: null,
+        usage: { model } satisfies NodeUsage,
+      });
+    } catch (e) {
+      console.error("apimart remix failed", e);
+      await setNode(ctx, node.id, {
+        status: "failed",
+        error: apimartUserMessage(e),
+      });
+    }
+    return;
+  }
+
+  // --- Generate mode ---
+  // If a previous tick extracted the last frame from an upstream Video, use
+  // it as the FIRST image input — it represents this scene's starting frame
+  // and gives visual continuity with the previous scene.
+  const finalImageUrls = merged._extractedFrameUrl
+    ? [merged._extractedFrameUrl, ...upstreamImageUrls]
+    : upstreamImageUrls;
   try {
     const model = merged.model ?? DEFAULT_VIDEO_MODEL;
     const { taskId } = await submitVideoGenerate({
@@ -208,6 +271,8 @@ async function submitVideoNode(
       duration: merged.duration,
       audio: merged.audio,
       imageUrls: finalImageUrls.length ? finalImageUrls : undefined,
+      generationType: merged.generationType,
+      endFrameUrl,
     });
     await setNode(ctx, node.id, {
       status: "running",
@@ -254,12 +319,35 @@ function collectUpstream(
   const inc = incomingEdges(edges, node.id);
   const outputs: NodeOutput[] = [];
   const usages: (NodeUsage | null)[] = [];
+  const sources: CanvasNodeRow[] = [];
+  // Image inputs split by which handle they're wired to: the dedicated
+  // `end_frame` handle designates the video's last frame; everything else is a
+  // regular start/reference image.
+  const startImages: string[] = [];
+  let endFrameUrl: string | undefined;
   for (const e of inc) {
     const src = findNode(nodes, e.source_node_id);
-    if (src?.output) outputs.push(src.output);
-    if (src) usages.push(src.usage);
+    if (!src) continue;
+    sources.push(src);
+    if (src.output) outputs.push(src.output);
+    usages.push(src.usage);
+    if (src.output?.kind === "image") {
+      if (e.target_handle === "end_frame") {
+        if (!endFrameUrl) endFrameUrl = src.output.url;
+      } else {
+        startImages.push(src.output.url);
+      }
+    }
   }
-  return { outputs, usages };
+  return { outputs, usages, sources, startImages, endFrameUrl };
+}
+
+/** Find the upstream node that produced a finished video — the source a
+ *  "remix" node extends. Returns the most recent successful video source. */
+function findVideoSource(sources: CanvasNodeRow[]): CanvasNodeRow | undefined {
+  return sources.find(
+    (s) => s.output?.kind === "video" && s.status === "success",
+  );
 }
 
 /** Collect non-empty `text` values from upstream text_prompt nodes wired to
@@ -301,16 +389,25 @@ function isAwaitingFrameExtraction(
   upstream: { outputs: NodeOutput[]; usages: (NodeUsage | null)[] },
 ): boolean {
   if ((node.type as string) !== "video_generate") return false;
+  const params = node.params as Record<string, unknown>;
+  // Remix extends the upstream video natively via its task id — no client-side
+  // last-frame extraction needed, so never gate on it.
+  if (params.mode === "remix") return false;
   const hasUpstreamVideo = upstream.outputs.some((o) => o.kind === "video");
   if (!hasUpstreamVideo) return false;
-  const params = node.params as Record<string, unknown>;
   return !params._extractedFrameUrl;
 }
 
 async function dispatchSingle(
   ctx: WorkflowContext,
   node: CanvasNodeRow,
-  upstream: { outputs: NodeOutput[]; usages: (NodeUsage | null)[] },
+  upstream: {
+    outputs: NodeOutput[];
+    usages: (NodeUsage | null)[];
+    sources?: CanvasNodeRow[];
+    startImages?: string[];
+    endFrameUrl?: string;
+  },
   upstreamTexts: string[] = [],
 ) {
   const t = node.type as string;
@@ -342,14 +439,18 @@ async function dispatchSingle(
       withTextPrefix<ImageGenerateParams>(),
     );
   } else if (t === "video_generate") {
-    const upstreamImages = upstream.outputs
-      .filter((o) => o.kind === "image")
-      .map((o) => o.url);
+    // Start/reference images come from the main image handle; the dedicated
+    // end-frame handle is passed separately so it lands in the end slot.
+    const upstreamImages =
+      upstream.startImages ??
+      upstream.outputs.filter((o) => o.kind === "image").map((o) => o.url);
     await submitVideoNode(
       ctx,
       node,
       upstreamImages,
       withTextPrefix<VideoGenerateParams>(),
+      findVideoSource(upstream.sources ?? []),
+      upstream.endFrameUrl,
     );
   } else if (t === "export") {
     await resolveExportNode(
@@ -476,6 +577,10 @@ async function pollRunningNodes(ctx: WorkflowContext) {
         const prevUsage = (node.usage ?? {}) as NodeUsage;
         const usage: NodeUsage = {
           model: prevUsage.model,
+          // Keep the completed task id around so a downstream "remix" node can
+          // extend this video — the live `apimart_task_id` column is cleared
+          // by the claim above.
+          taskId: node.apimart_task_id,
           actualTime: res.data.actual_time,
           estimatedTime: res.data.estimated_time,
           completedAt: res.data.completed,

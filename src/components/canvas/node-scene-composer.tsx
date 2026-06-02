@@ -24,6 +24,7 @@ type UpstreamClip = {
   nodeId: string;
   url: string;
   status: string;
+  name: string | null;
 };
 
 export function SceneComposerNode({ data, selected }: NodeProps) {
@@ -60,12 +61,15 @@ export function SceneComposerNode({ data, selected }: NodeProps) {
     sourceNodes.sort((a, b) => a.position.y - b.position.y);
     const clips = sourceNodes
       .map((n) => {
-        const output = (n.data as FlowNodeData).output;
-        if (!output || output.kind !== "video") return null;
+        const fd = n.data as FlowNodeData;
+        if (!fd.output || fd.output.kind !== "video") return null;
+        const displayName =
+          (fd.params as { displayName?: string } | undefined)?.displayName;
         return {
           nodeId: n.id,
-          url: output.url,
-          status: (n.data as FlowNodeData).status,
+          url: fd.output.url,
+          status: fd.status,
+          name: displayName?.trim() || null,
         };
       })
       .filter(Boolean) as UpstreamClip[];
@@ -237,8 +241,15 @@ export function SceneComposerNode({ data, selected }: NodeProps) {
                   <span className="tabular-nums text-neutral-400">
                     {i + 1}.
                   </span>
-                  <span className="truncate text-neutral-500">
-                    scene · {c.status}
+                  <span className="truncate text-neutral-700 dark:text-neutral-300">
+                    {c.name ?? (
+                      <span className="italic text-neutral-500">
+                        scene {i + 1}
+                      </span>
+                    )}
+                  </span>
+                  <span className="ml-auto shrink-0 text-neutral-500">
+                    {c.status}
                   </span>
                 </li>
               ))}

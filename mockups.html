@@ -1,0 +1,1172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Canvas — Feature Mockups</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        /* Tailwind neutrals (real product palette) */
+        --n50:  #fafafa;
+        --n100: #f5f5f5;
+        --n200: #e5e5e5;
+        --n300: #d4d4d4;
+        --n400: #a3a3a3;
+        --n500: #737373;
+        --n600: #525252;
+        --n700: #404040;
+        --n800: #262626;
+        --n900: #171717;
+        --n950: #0a0a0a;
+
+        /* Action colors (from real codebase) */
+        --emerald-400: #34d399;
+        --emerald-500: #10b981;
+        --emerald-600: #059669;
+        --emerald-700: #047857;
+        --amber-300:   #fcd34d;
+        --amber-400:   #fbbf24;
+        --amber-600:   #d97706;
+        --blue-400:    #60a5fa;
+        --blue-500:    #3b82f6;
+        --blue-600:    #2563eb;
+        --red-400:     #f87171;
+        --red-500:     #ef4444;
+        --red-600:     #dc2626;
+        --purple-500:  #a855f7;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { background: #eef1f6; font-family: "Inter", sans-serif; color: var(--n900); }
+      body.board {
+        display: flex; flex-direction: column; align-items: center;
+        gap: 56px; padding: 56px 24px 80px; min-height: 100vh;
+      }
+      .pagehint {
+        color: #64748b; font-size: 13px; text-align: center; line-height: 1.6;
+      }
+      .pagehint b { color: #334155; }
+      .pagehint code { background: #e2e8f0; padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+
+      .mock { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+      .mock .cap {
+        font-size: 13px; font-weight: 600; color: #475569; letter-spacing: .3px;
+      }
+
+      /* ===========================================================
+         Mac window chrome
+         =========================================================== */
+      .win {
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #cbd5e1;
+        box-shadow:
+          0 24px 50px rgba(15, 23, 42, 0.12),
+          0 6px 14px rgba(15, 23, 42, 0.06);
+      }
+      .win-bar {
+        background: #f1f5f9;
+        border-bottom: 1px solid #cbd5e1;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 12px;
+        flex: none;
+      }
+      .tl { width: 9px; height: 9px; border-radius: 50%; }
+      .tl.r { background: #ff5f57; }
+      .tl.y { background: #febc2e; }
+      .tl.g { background: #28c840; }
+      .url {
+        margin-left: 8px;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 9.5px;
+        color: #64748b;
+        padding: 3px 10px;
+      }
+      .url b { color: #1e293b; font-weight: 600; }
+
+      .ic { display: inline-flex; }
+      .ico {
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex: none;
+      }
+
+      /* ===========================================================
+         1) CANVAS EDITOR — light mode
+         =========================================================== */
+      .layer.editor { width: 920px; }
+
+      /* toolbar — matches CanvasToolbar component */
+      .ce-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--n200);
+        background: #fff;
+        flex: none;
+        color: var(--n900);
+      }
+      .ce-top .back {
+        padding: 6px; border-radius: 6px;
+        color: var(--n500);
+      }
+      .ce-top .back .ico { width: 16px; height: 16px; }
+      .ce-top .wfname-btn {
+        font-size: 13px; font-weight: 500; color: var(--n900);
+        padding: 2px 6px; border-radius: 4px;
+      }
+      .ce-top .grow { flex: 1; }
+      .ce-top .actions {
+        display: flex; align-items: center; gap: 8px;
+      }
+      .ce-top .balance {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 11px; color: var(--n700);
+        background: #fff;
+        border: 1px solid var(--n300);
+        border-radius: 6px;
+        padding: 4px 8px;
+      }
+      .ce-top .balance .ico { width: 12px; height: 12px; }
+      .ce-top .balance .used { color: var(--n400); }
+      .ce-top .balance .refresh { opacity: 0.5; }
+      .ce-top .seq {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 11px; color: var(--n800);
+        background: #fff;
+        border: 1px solid var(--n300);
+        border-radius: 6px;
+        padding: 5px 9px;
+        font-weight: 500;
+      }
+      .ce-top .seq .ico { width: 13px; height: 13px; color: var(--emerald-600); }
+      .ce-top .run {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 12px; font-weight: 500; color: #fff;
+        background: var(--emerald-600);
+        border-radius: 6px;
+        padding: 6px 12px;
+      }
+      .ce-top .run .ico { width: 14px; height: 14px; stroke: #fff; }
+      .ce-top .icon-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 30px; height: 30px;
+        border-radius: 6px;
+        border: 1px solid var(--n300);
+        color: var(--n500);
+        background: #fff;
+      }
+      .ce-top .icon-btn.danger { color: var(--red-500); }
+      .ce-top .icon-btn.ghost { border: none; background: transparent; }
+      .ce-top .icon-btn .ico { width: 14px; height: 14px; }
+      .ce-top .signout {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 12px; color: var(--n800);
+        background: #fff;
+        border: 1px solid var(--n300);
+        border-radius: 6px;
+        padding: 5px 11px;
+      }
+      .ce-top .signout .ico { width: 14px; height: 14px; }
+
+      .ce-body {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+        height: 470px;
+      }
+
+      /* sidebar — matches CanvasSidebar component */
+      .ce-side {
+        width: 178px;
+        background: #fff;
+        border-right: 1px solid var(--n200);
+        flex: none;
+        display: flex; flex-direction: column;
+        color: var(--n900);
+      }
+      .ce-side .sh {
+        padding: 10px 12px;
+        font-size: 11px; font-weight: 600;
+        color: var(--n600);
+        text-transform: uppercase; letter-spacing: 0.6px;
+        border-bottom: 1px solid var(--n200);
+      }
+      .ce-side .grp {
+        padding: 8px;
+        border-bottom: 1px solid var(--n100);
+      }
+      .ce-side .grp:last-child { border-bottom: none; }
+      .ce-side .grp .gh {
+        padding: 4px 8px;
+        font-size: 10px;
+        color: var(--n500);
+        text-transform: uppercase; letter-spacing: 0.6px;
+      }
+      .ce-side .grp .it {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 12px;
+        color: var(--n800);
+        padding: 7px 8px;
+        border-radius: 6px;
+      }
+      .ce-side .grp .it .ico { width: 14px; height: 14px; color: var(--n500); }
+
+      /* canvas with dotted grid (light) */
+      .ce-canvas {
+        flex: 1;
+        background:
+          radial-gradient(circle, #d4d4d4 1px, transparent 1px) 0 0 / 22px 22px,
+          var(--n50);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .ce-zoom {
+        position: absolute;
+        left: 12px; bottom: 12px;
+        background: #fff;
+        border: 1px solid var(--n200);
+        border-radius: 8px;
+        display: flex;
+        box-shadow: 0 4px 10px rgba(15,23,42,0.06);
+      }
+      .ce-zoom span {
+        width: 26px; height: 26px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--n600);
+        border-right: 1px solid var(--n100);
+        font-size: 12px;
+      }
+      .ce-zoom span:last-child { border-right: none; font-size: 10px; width: 42px; color: var(--n500); }
+
+      .ce-minimap {
+        position: absolute;
+        right: 12px; bottom: 12px;
+        width: 120px; height: 82px;
+        background: rgba(255,255,255,0.92);
+        border: 1px solid var(--n200);
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(15,23,42,0.06);
+        padding: 6px;
+      }
+      .ce-minimap .mb {
+        height: 9px;
+        background: var(--n300);
+        border-radius: 2px;
+        position: absolute;
+      }
+
+      /* Nodes on canvas — NodeShell mini reproduction (light) */
+      .cnode {
+        position: absolute;
+        background: #fff;
+        border: 1px solid var(--n300);
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(15,23,42,0.05);
+        color: var(--n900);
+        font-size: 10px;
+      }
+      .cnode .nh {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 7px 9px;
+        border-bottom: 1px solid var(--n200);
+      }
+      .cnode .nh .lt {
+        font-size: 11px; font-weight: 600; color: var(--n900);
+      }
+      .cnode .nh .rt {
+        display: flex; align-items: center; gap: 6px;
+      }
+      .cnode .nh .sb {
+        display: inline-flex; align-items: center; gap: 3px;
+        font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px;
+      }
+      .cnode .nh .sb .ico { width: 10px; height: 10px; }
+      .cnode .nh .sb.idle { color: var(--n500); }
+      .cnode .nh .sb.queued { color: var(--amber-600); }
+      .cnode .nh .sb.running { color: var(--blue-600); }
+      .cnode .nh .sb.success { color: var(--emerald-600); }
+      .cnode .nh .sb.failed { color: var(--red-600); }
+      .cnode .nh .run-mini {
+        width: 18px; height: 18px; border-radius: 4px;
+        background: var(--emerald-600);
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      .cnode .nh .run-mini .ico { width: 10px; height: 10px; stroke: #fff; }
+      .cnode .pbar {
+        height: 3px; background: var(--n100);
+      }
+      .cnode .pbar i {
+        display: block; height: 100%; background: var(--blue-500); width: 64%;
+      }
+      .cnode .nb {
+        padding: 8px 9px;
+        font-size: 10px;
+        color: var(--n700);
+        line-height: 1.45;
+      }
+      .cnode .thumb {
+        width: 100%;
+        height: 80px;
+        border-radius: 4px;
+        background: linear-gradient(135deg, #1e3a8a, #6d28d9 55%, #ec4899);
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--n200);
+      }
+      .cnode .thumb::after {
+        content: ""; position: absolute; inset: 0;
+        background:
+          radial-gradient(circle at 30% 70%, rgba(255,255,255,0.18) 0 12%, transparent 13%),
+          radial-gradient(circle at 70% 30%, rgba(255,255,255,0.12) 0 10%, transparent 11%);
+      }
+      .cnode .vthumb {
+        width: 100%; height: 80px; border-radius: 4px;
+        background: var(--n900);
+        display: flex; align-items: center; justify-content: center;
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--n200);
+      }
+      .cnode .vthumb .play {
+        width: 28px; height: 28px; border-radius: 50%;
+        background: rgba(255,255,255,0.18);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .cnode .vthumb .play .ico { width: 14px; height: 14px; fill: #fff; stroke: #fff; }
+      .cnode .ftr {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 6px 9px;
+        border-top: 1px solid var(--n200);
+        font-size: 9px;
+        color: var(--n500);
+      }
+      .cnode .ftr b { color: var(--n800); font-weight: 600; }
+      .cnode .pn {
+        position: absolute; width: 12px; height: 12px; border-radius: 50%;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 1px var(--n300);
+      }
+      .cnode .pn.l-img   { background: var(--blue-500);    left: -6px; top: 32px; }
+      .cnode .pn.l-text  { background: var(--amber-400);   left: -6px; top: 60px; }
+      .cnode .pn.l-end   { background: var(--emerald-500); left: -6px; top: 60px; }
+      .cnode .pn.r-img   { background: var(--emerald-500); right: -6px; top: 50%; transform: translateY(-50%); }
+      .cnode .pn.r-video { background: var(--purple-500);  right: -6px; top: 50%; transform: translateY(-50%); }
+      .cnode .pn.r-text  { background: var(--amber-400);   right: -6px; top: 50%; transform: translateY(-50%); }
+
+      .edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+
+      /* ===========================================================
+         2) WORKFLOWS PAGE — light mode
+         =========================================================== */
+      .layer.wfs { width: 920px; }
+      .wfs-shell { background: var(--n50); color: var(--n900); }
+
+      .wfs-hdr {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 32px;
+        border-bottom: 1px solid var(--n200);
+        background: #fff;
+      }
+      .wfs-hdr .brand {
+        display: flex; align-items: center; gap: 8px;
+      }
+      .wfs-hdr .brand .ico { width: 18px; height: 18px; color: var(--emerald-600); }
+      .wfs-hdr .brand .nm { font-size: 16px; font-weight: 600; color: var(--n900); }
+      .wfs-hdr .hr-act { display: flex; align-items: center; gap: 8px; }
+      .wfs-hdr .icon-btn {
+        width: 32px; height: 32px; border-radius: 6px;
+        border: 1px solid var(--n300);
+        color: var(--n500);
+        background: #fff;
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      .wfs-hdr .icon-btn .ico { width: 14px; height: 14px; }
+      .wfs-hdr .signout {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 13px; color: var(--n800);
+        background: #fff;
+        border: 1px solid var(--n300);
+        border-radius: 6px;
+        padding: 6px 12px;
+      }
+      .wfs-hdr .signout .ico { width: 14px; height: 14px; }
+
+      .wfs-main { padding: 28px 32px 36px; }
+      .wfs-titlebar {
+        display: flex; align-items: flex-end; justify-content: space-between;
+        margin-bottom: 22px;
+      }
+      .wfs-titlebar h2 {
+        font-size: 19px; font-weight: 600; color: var(--n900);
+      }
+      .wfs-titlebar .sub {
+        font-size: 13px; color: var(--n500); margin-top: 3px;
+      }
+      .wfs-titlebar .new {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 13px; font-weight: 500; color: #fff;
+        background: var(--emerald-600);
+        border-radius: 6px;
+        padding: 8px 16px;
+      }
+      .wfs-titlebar .new .ico { width: 14px; height: 14px; stroke: #fff; }
+
+      .wfs-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+      .wfcard {
+        border: 1px solid var(--n200);
+        border-radius: 11px;
+        background: #fff;
+        overflow: hidden;
+      }
+      .wfcard .thumb {
+        aspect-ratio: 4 / 3;
+        background: var(--n100);
+        position: relative;
+      }
+      .wfcard .thumb.g1 { background: linear-gradient(135deg, #1e293b, #4338ca 60%, #c026d3); }
+      .wfcard .thumb.g2 { background: linear-gradient(135deg, #064e3b, #16a34a 55%, #fde047); }
+      .wfcard .thumb.g3 { background: linear-gradient(135deg, #7c2d12, #ea580c 50%, #fb923c); }
+      .wfcard .thumb.g4 { background: linear-gradient(135deg, #312e81, #6366f1 55%, #ec4899); }
+      .wfcard .thumb.g5 { background: linear-gradient(135deg, #082f49, #0284c7 50%, #67e8f9); }
+      .wfcard .thumb.empty {
+        display: flex; align-items: center; justify-content: center;
+        color: var(--n300);
+      }
+      .wfcard .thumb.empty .ico { width: 36px; height: 36px; }
+      .wfcard .thumb::after {
+        content: ""; position: absolute; inset: 0;
+        background:
+          radial-gradient(circle at 30% 70%, rgba(255,255,255,0.18) 0 14%, transparent 15%),
+          radial-gradient(circle at 70% 30%, rgba(255,255,255,0.10) 0 10%, transparent 11%);
+      }
+      .wfcard.empty .thumb::after { content: none; }
+      .wfcard .meta {
+        padding: 12px 14px;
+        display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+      }
+      .wfcard .nm { font-size: 13px; font-weight: 500; color: var(--n900); }
+      .wfcard .ag { font-size: 11px; color: var(--n500); margin-top: 3px; }
+      .wfcard .more { color: var(--n400); }
+      .wfcard .more .ico { width: 15px; height: 15px; }
+
+      /* ===========================================================
+         3 & 4) SINGLE-NODE ZOOM (Image / Video Generate)
+         light-mode NodeShell faithful reproduction
+         =========================================================== */
+      .layer.node {
+        width: 360px;
+        position: relative;
+        padding: 18px 18px 18px 22px;
+      }
+      .nshell {
+        background: #fff;
+        border: 1px solid var(--n300);
+        border-radius: 10px;
+        box-shadow: 0 24px 50px rgba(15, 23, 42, 0.12),
+                    0 6px 14px rgba(15, 23, 42, 0.06);
+        color: var(--n900);
+        position: relative;
+        overflow: visible;
+      }
+
+      .ns-head {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--n200);
+      }
+      .ns-head .ti {
+        font-size: 12px; font-weight: 600; color: var(--n900);
+        display: inline-flex; align-items: center; gap: 7px;
+      }
+      .ns-head .est { font-size: 10px; color: var(--n500); font-weight: 400; }
+      .ns-head .rt { display: flex; align-items: center; gap: 7px; }
+      .ns-head .sb {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+      }
+      .ns-head .sb.success { color: var(--emerald-600); }
+      .ns-head .sb.running { color: var(--blue-600); }
+      .ns-head .sb .ico { width: 12px; height: 12px; }
+      .ns-head .dup { color: var(--n500); padding: 2px; }
+      .ns-head .dup .ico { width: 13px; height: 13px; }
+      .ns-head .run {
+        width: 22px; height: 22px; border-radius: 5px;
+        background: var(--emerald-600);
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      .ns-head .run .ico { width: 12px; height: 12px; stroke: #fff; }
+
+      .ns-bar { height: 4px; background: var(--n100); }
+      .ns-bar i { display: block; height: 100%; background: var(--blue-500); width: 64%; }
+
+      .ns-body { padding: 10px 12px 12px; }
+      .ns-body > * + * { margin-top: 8px; }
+
+      .name-input {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 11px; color: var(--n800);
+        background: var(--n50);
+        border: 1px solid var(--n300);
+        border-radius: 5px;
+        padding: 5px 8px;
+      }
+      .name-input .ico { width: 11px; height: 11px; color: var(--n400); }
+      .name-input .ph { color: var(--n400); margin-left: auto; font-size: 9px; }
+
+      .upref {
+        display: flex; flex-wrap: wrap; gap: 4px;
+        font-size: 10px; color: var(--n600);
+      }
+      .upref .pill {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: var(--n100);
+        border: 1px solid var(--n200);
+        padding: 2px 7px; border-radius: 4px;
+        color: var(--n800);
+      }
+      .upref .pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+      .hint-mute {
+        font-size: 10px; color: var(--n500); line-height: 1.4;
+      }
+      .hint-warn {
+        font-size: 10px; color: var(--amber-600);
+      }
+
+      .field-label {
+        font-size: 10px; font-weight: 500;
+        color: var(--n600);
+        text-transform: uppercase; letter-spacing: 0.4px;
+        margin-bottom: 4px;
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .field-label .enhance {
+        display: inline-flex; align-items: center; gap: 3px;
+        font-size: 10px;
+        color: var(--n700);
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 500;
+      }
+      .field-label .enhance .ico { width: 11px; height: 11px; color: var(--emerald-600); }
+
+      .native-select {
+        width: 100%;
+        font-size: 11px; color: var(--n900);
+        background: var(--n50);
+        border: 1px solid var(--n300);
+        border-radius: 5px;
+        padding: 6px 8px;
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .native-select .v { color: var(--n900); }
+      .native-select .chev { color: var(--n400); font-size: 9px; }
+      .native-select.disabled { opacity: 0.6; }
+
+      .ta {
+        width: 100%;
+        font-size: 11px; color: var(--n900);
+        background: var(--n50);
+        border: 1px solid var(--n300);
+        border-radius: 5px;
+        padding: 8px 10px;
+        line-height: 1.5;
+        min-height: 56px;
+      }
+      .ta.focus { border-color: var(--n500); background: #fff; }
+      .ta .ph { color: var(--n400); }
+
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+      .check {
+        display: inline-flex; align-items: center; gap: 7px;
+        font-size: 11px; color: var(--n800);
+      }
+      .check .box {
+        width: 13px; height: 13px; border-radius: 3px;
+        border: 1px solid var(--n400);
+        background: #fff;
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      .check .box.checked { background: var(--emerald-600); border-color: var(--emerald-600); }
+      .check .box.checked .ico { width: 9px; height: 9px; stroke: #fff; }
+
+      .output-image {
+        width: 100%; height: 130px;
+        border-radius: 5px;
+        background: linear-gradient(135deg, #1e3a8a, #6d28d9 50%, #ec4899);
+        border: 1px solid var(--n200);
+        position: relative;
+      }
+      .output-image::after {
+        content: ""; position: absolute; inset: 0;
+        background:
+          radial-gradient(circle at 25% 75%, rgba(255,255,255,0.22) 0 14%, transparent 15%),
+          radial-gradient(circle at 70% 35%, rgba(255,255,255,0.14) 0 10%, transparent 11%);
+      }
+      .output-video {
+        width: 100%; height: 130px;
+        border-radius: 5px;
+        background: var(--n900);
+        border: 1px solid var(--n200);
+        position: relative;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .output-video .play {
+        width: 38px; height: 38px; border-radius: 50%;
+        background: rgba(255,255,255,0.18);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .output-video .play .ico { width: 16px; height: 16px; fill: #fff; stroke: #fff; }
+      .output-video .vbar {
+        position: absolute; left: 0; right: 0; bottom: 0; height: 4px;
+        background: rgba(255,255,255,0.15);
+      }
+      .output-video .vbar i {
+        display: block; height: 100%; width: 64%;
+        background: var(--blue-500);
+      }
+
+      .download-btn {
+        display: flex; align-items: center; justify-content: center; gap: 6px;
+        width: 100%;
+        font-size: 11px; color: var(--n800);
+        background: #fff;
+        border: 1px solid var(--n300);
+        border-radius: 5px;
+        padding: 6px 0;
+        margin-top: 6px;
+      }
+      .download-btn .ico { width: 12px; height: 12px; }
+
+      .usage-badge {
+        font-size: 10px; color: var(--n500);
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 2px 0;
+      }
+      .usage-badge b { color: var(--n800); font-weight: 600; }
+
+      .output-history {
+        border-top: 1px solid var(--n200);
+        padding-top: 8px;
+        margin-top: 8px;
+      }
+      .output-history .h {
+        font-size: 10px; color: var(--n500);
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 5px;
+      }
+      .output-history .row {
+        display: flex; gap: 5px;
+      }
+      .output-history .th {
+        width: 44px; height: 32px; border-radius: 3px;
+        border: 1px solid var(--n200);
+      }
+      .output-history .th.g1 { background: linear-gradient(135deg, #1e3a8a, #6d28d9); }
+      .output-history .th.g2 { background: linear-gradient(135deg, #166534, #facc15); }
+      .output-history .th.g3 { background: linear-gradient(135deg, #7c2d12, #f97316); }
+      .output-history .th.cur { border-color: var(--emerald-500); box-shadow: 0 0 0 1px var(--emerald-500); }
+
+      /* Floating handles around node card */
+      .layer.node .h-out {
+        position: absolute;
+        width: 14px; height: 14px; border-radius: 50%;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 1px var(--n300);
+      }
+
+      /* ===========================================================
+         print rules
+         =========================================================== */
+      @media print {
+        html, body { background: #fff; }
+        .pagehint { display: none; }
+        *, *::before, *::after {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
+        .mock { page-break-inside: avoid; break-inside: avoid; }
+        @page { margin: 10mm; }
+      }
+
+      /* isolate-mode for screenshot (?only=N) */
+      body.isolate {
+        background: transparent !important;
+        padding: 0 !important;
+        gap: 0 !important;
+        align-items: flex-start !important;
+      }
+      body.isolate .pagehint,
+      body.isolate .mock .cap { display: none !important; }
+      body.isolate .mock { gap: 0 !important; }
+    </style>
+  </head>
+  <body class="board">
+    <script>
+      (function () {
+        const only = new URLSearchParams(location.search).get("only");
+        if (only === null) return;
+        document.body.classList.add("isolate");
+        const n = parseInt(only, 10);
+        document.querySelectorAll(".mock").forEach((m, i) => {
+          if (i !== n) m.style.display = "none";
+        });
+      })();
+    </script>
+
+    <div class="pagehint">
+      Feature mockups · light mode — <b>screenshot tiap window manual</b>:<br>
+      ⌘+Shift+4 → drag select <b>—or—</b> DevTools (⌥⌘I) → ⌘⇧P → "Capture node screenshot" on the <code>.layer</code> element<br>
+      <span style="opacity:.7">Tip: append <code>?only=N</code> (0–3) to view a single mockup on transparent bg, e.g. <code>mockups.html?only=2</code></span>
+    </div>
+
+    <!-- ================== 1) CANVAS EDITOR ================== -->
+    <div class="mock">
+      <div class="cap">Canvas Editor · /canvas/[id]</div>
+      <div class="layer editor">
+        <div class="win">
+          <div class="win-bar">
+            <span class="tl r"></span><span class="tl y"></span><span class="tl g"></span>
+            <span class="url">canvas.app<b>/canvas/wf_8f3a</b></span>
+          </div>
+
+          <div class="ce-top">
+            <span class="back" title="Back to workflows"><svg class="ico" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></span>
+            <span class="wfname-btn" title="Click to rename">Product Launch Reel</span>
+            <span class="grow"></span>
+
+            <div class="actions">
+              <span class="balance" title="Refresh APImart balance">
+                <svg class="ico" viewBox="0 0 24 24"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+                <span>remain 12.40</span>
+                <span class="used">· used 3.60</span>
+                <svg class="ico refresh" viewBox="0 0 24 24" style="width:11px;height:11px;"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><polyline points="21 3 21 8 16 8"/></svg>
+              </span>
+
+              <span class="seq" title="Sequential — runs one node at a time">
+                <svg class="ico" viewBox="0 0 24 24"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+                Sequential
+              </span>
+
+              <span class="run">
+                <svg class="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Run all
+              </span>
+
+              <span class="icon-btn danger" title="Delete workflow"><svg class="ico" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+              <span class="icon-btn ghost" title="Toggle layout"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></span>
+              <span class="icon-btn ghost" title="Theme"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/></svg></span>
+              <span class="signout">
+                <svg class="ico" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Sign out
+              </span>
+            </div>
+          </div>
+
+          <div class="ce-body">
+            <div class="ce-side">
+              <div class="sh">Nodes</div>
+
+              <div class="grp">
+                <div class="gh">Input</div>
+                <div class="it"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Image Upload</div>
+                <div class="it"><svg class="ico" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>Text Prompt</div>
+              </div>
+
+              <div class="grp">
+                <div class="gh">AI</div>
+                <div class="it"><svg class="ico" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Storyboard</div>
+                <div class="it"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>Image</div>
+                <div class="it"><svg class="ico" viewBox="0 0 24 24"><path d="m22 8-6 4 6 4Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>Video</div>
+              </div>
+
+              <div class="grp">
+                <div class="gh">Compose</div>
+                <div class="it"><svg class="ico" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>Scene Composer</div>
+              </div>
+
+              <div class="grp">
+                <div class="gh">Output</div>
+                <div class="it"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</div>
+              </div>
+            </div>
+
+            <div class="ce-canvas">
+              <svg class="edges" viewBox="0 0 720 470" preserveAspectRatio="none">
+                <defs>
+                  <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                    <path d="M0 0 L10 5 L0 10 z" fill="#a3a3a3"/>
+                  </marker>
+                </defs>
+                <path d="M 178 88 C 240 88 240 160 308 160" stroke="#a3a3a3" stroke-width="1.5" fill="none" marker-end="url(#ar)"/>
+                <path d="M 472 196 C 540 196 540 234 596 234" stroke="#a3a3a3" stroke-width="1.5" fill="none" marker-end="url(#ar)"/>
+                <path d="M 596 286 C 530 320 280 332 220 332" stroke="#a3a3a3" stroke-width="1.5" fill="none" marker-end="url(#ar)"/>
+              </svg>
+
+              <div class="cnode" style="left: 22px; top: 50px; width: 156px;">
+                <div class="nh">
+                  <span class="lt">Text Prompt</span>
+                  <span class="rt">
+                    <span class="sb success"><svg class="ico" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>success</span>
+                  </span>
+                </div>
+                <div class="nb">cinematic futuristic city at night, neon, rain reflections…</div>
+                <span class="pn r-text"></span>
+              </div>
+
+              <div class="cnode" style="left: 308px; top: 120px; width: 164px;">
+                <div class="nh">
+                  <span class="lt">Image</span>
+                  <span class="rt">
+                    <span class="sb success"><svg class="ico" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>success</span>
+                    <span class="run-mini"><svg class="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>
+                  </span>
+                </div>
+                <div class="nb"><div class="thumb"></div></div>
+                <div class="ftr"><span>Seedream-4.5</span><b>$0.04</b></div>
+                <span class="pn l-img"></span>
+                <span class="pn l-text"></span>
+                <span class="pn r-img"></span>
+              </div>
+
+              <div class="cnode" style="left: 596px; top: 180px; width: 164px;">
+                <div class="nh">
+                  <span class="lt">Video Generate <span style="color:var(--n500);font-weight:400;">~80s</span></span>
+                  <span class="rt">
+                    <span class="sb running"><svg class="ico" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.5"/></svg>running 64%</span>
+                  </span>
+                </div>
+                <div class="pbar"><i></i></div>
+                <div class="nb"><div class="vthumb"><span class="play"><svg class="ico" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="6 4 20 12 6 20 6 4"/></svg></span></div></div>
+                <div class="ftr"><span>VEO3 · 5s</span><b>$0.50</b></div>
+                <span class="pn l-img"></span>
+                <span class="pn l-end"></span>
+                <span class="pn r-video"></span>
+              </div>
+
+              <div class="cnode" style="left: 80px; top: 304px; width: 140px;">
+                <div class="nh">
+                  <span class="lt">Export</span>
+                  <span class="rt">
+                    <span class="sb idle"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>idle</span>
+                  </span>
+                </div>
+                <div class="nb">Waiting for upstream…</div>
+                <span class="pn l-img" style="background: var(--purple-500);"></span>
+              </div>
+
+              <div class="ce-zoom"><span>−</span><span>+</span><span>72%</span></div>
+              <div class="ce-minimap">
+                <span class="mb" style="left: 10px; top: 16px; width: 22px;"></span>
+                <span class="mb" style="left: 42px; top: 26px; width: 24px;"></span>
+                <span class="mb" style="left: 76px; top: 36px; width: 22px;"></span>
+                <span class="mb" style="left: 18px; top: 56px; width: 18px;"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================== 2) WORKFLOWS PAGE ================== -->
+    <div class="mock">
+      <div class="cap">Workflows · /</div>
+      <div class="layer wfs">
+        <div class="win">
+          <div class="win-bar">
+            <span class="tl r"></span><span class="tl y"></span><span class="tl g"></span>
+            <span class="url">canvas.app<b>/</b></span>
+          </div>
+
+          <div class="wfs-shell">
+            <header class="wfs-hdr">
+              <div class="brand">
+                <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <span class="nm">Canvas</span>
+              </div>
+              <div class="hr-act">
+                <span class="icon-btn" title="Theme"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg></span>
+                <span class="signout">
+                  <svg class="ico" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                  Sign out
+                </span>
+              </div>
+            </header>
+
+            <main class="wfs-main">
+              <div class="wfs-titlebar">
+                <div>
+                  <h2>Workflows</h2>
+                  <div class="sub">6 workflows</div>
+                </div>
+                <span class="new">
+                  <svg class="ico" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  New workflow
+                </span>
+              </div>
+
+              <div class="wfs-grid">
+                <div class="wfcard">
+                  <div class="thumb g1"></div>
+                  <div class="meta">
+                    <div>
+                      <div class="nm">Product Launch Reel</div>
+                      <div class="ag">updated 12m ago</div>
+                    </div>
+                    <span class="more"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></span>
+                  </div>
+                </div>
+                <div class="wfcard">
+                  <div class="thumb g2"></div>
+                  <div class="meta">
+                    <div>
+                      <div class="nm">Skincare Hero Shots</div>
+                      <div class="ag">updated 2h ago</div>
+                    </div>
+                    <span class="more"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></span>
+                  </div>
+                </div>
+                <div class="wfcard">
+                  <div class="thumb g3"></div>
+                  <div class="meta">
+                    <div>
+                      <div class="nm">IG Carousel · Autumn</div>
+                      <div class="ag">updated yesterday</div>
+                    </div>
+                    <span class="more"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></span>
+                  </div>
+                </div>
+                <div class="wfcard">
+                  <div class="thumb g4"></div>
+                  <div class="meta">
+                    <div>
+                      <div class="nm">Brand Anim Loop</div>
+                      <div class="ag">updated 2d ago</div>
+                    </div>
+                    <span class="more"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></span>
+                  </div>
+                </div>
+                <div class="wfcard">
+                  <div class="thumb g5"></div>
+                  <div class="meta">
+                    <div>
+                      <div class="nm">Backdrop Variants</div>
+                      <div class="ag">updated 4d ago</div>
+                    </div>
+                    <span class="more"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></span>
+                  </div>
+                </div>
+                <div class="wfcard empty">
+                  <div class="thumb empty"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg></div>
+                  <div class="meta">
+                    <div>
+                      <div class="nm">Untitled workflow</div>
+                      <div class="ag">just now</div>
+                    </div>
+                    <span class="more"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></span>
+                  </div>
+                </div>
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================== 3) IMAGE NODE ================== -->
+    <div class="mock">
+      <div class="cap">Image node · single component (zoom)</div>
+      <div class="layer node">
+        <span class="h-out" style="background: var(--blue-500); left: 14px; top: 76px;"></span>
+        <span class="h-out" style="background: var(--amber-400); left: 14px; top: 108px;"></span>
+        <span class="h-out" style="background: var(--emerald-500); right: 14px; top: 50%; transform: translateY(-50%);"></span>
+
+        <div class="nshell">
+          <div class="ns-head">
+            <div class="ti">Image</div>
+            <div class="rt">
+              <span class="sb success"><svg class="ico" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>success</span>
+              <span class="dup" title="Duplicate"><svg class="ico" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
+              <span class="run" title="Run node"><svg class="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>
+            </div>
+          </div>
+
+          <div class="ns-body">
+            <div class="name-input">
+              <svg class="ico" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+              <span>Hero shot</span>
+              <span class="ph">node name</span>
+            </div>
+
+            <div class="upref">
+              <span class="pill"><span class="dot" style="background: var(--amber-400);"></span>Text Prompt #1</span>
+            </div>
+
+            <div class="hint-mute">Optional: connect image(s) for image-to-image / merge / edit</div>
+
+            <div>
+              <div class="field-label">Model</div>
+              <div class="native-select">
+                <span class="v">Seedream-4.5 — APImart · $0.04 <span style="color:var(--n500);">(T2I + I2I + edit)</span></span>
+                <span class="chev">▾</span>
+              </div>
+            </div>
+
+            <div>
+              <div class="field-label">
+                <span>Prompt (idea)</span>
+                <span class="enhance"><svg class="ico" viewBox="0 0 24 24"><path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2Z"/></svg>Enhance</span>
+              </div>
+              <div class="ta focus">cinematic futuristic city at night, neon signs reflected in puddles, rain, shallow depth of field, 35mm</div>
+              <div style="text-align: right; padding-top: 3px; color: var(--n500); font-size: 10px;">✨ ▾</div>
+            </div>
+
+            <div class="grid2">
+              <div>
+                <div class="field-label">Aspect</div>
+                <div class="native-select"><span class="v">1:1</span><span class="chev">▾</span></div>
+              </div>
+              <div>
+                <div class="field-label">Res</div>
+                <div class="native-select"><span class="v">2K</span><span class="chev">▾</span></div>
+              </div>
+            </div>
+
+            <div class="output-image"></div>
+            <button class="download-btn">
+              <svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download image
+            </button>
+
+            <div class="usage-badge"><span>finished · <b>$0.04</b> · 12s</span><span>2026-05-24</span></div>
+
+            <div class="output-history">
+              <div class="h"><span>OUTPUT HISTORY</span><span>3</span></div>
+              <div class="row">
+                <span class="th g1 cur"></span>
+                <span class="th g2"></span>
+                <span class="th g3"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================== 4) VIDEO GENERATE NODE ================== -->
+    <div class="mock">
+      <div class="cap">Video Generate node · single component (zoom)</div>
+      <div class="layer node">
+        <span class="h-out" style="background: var(--blue-500); left: 14px; top: 76px;"></span>
+        <span class="h-out" style="background: var(--emerald-500); left: 14px; top: 108px;"></span>
+        <span class="h-out" style="background: var(--amber-400); left: 14px; top: 140px;"></span>
+        <span class="h-out" style="background: var(--purple-500); right: 14px; top: 50%; transform: translateY(-50%);"></span>
+
+        <div class="nshell">
+          <div class="ns-head">
+            <div class="ti">Video Generate <span class="est">~80s</span></div>
+            <div class="rt">
+              <span class="sb running"><svg class="ico" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.5"/></svg>running 64%</span>
+              <span class="dup"><svg class="ico" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
+              <span class="run"><svg class="ico" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg></span>
+            </div>
+          </div>
+          <div class="ns-bar"><i></i></div>
+
+          <div class="ns-body">
+            <div class="name-input">
+              <svg class="ico" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+              <span>Scene 1 motion</span>
+              <span class="ph">node name</span>
+            </div>
+
+            <div class="upref">
+              <span class="pill"><span class="dot" style="background: var(--blue-500);"></span>Image #1 · Hero shot</span>
+            </div>
+
+            <div class="hint-mute">Connect images: 🔵 start frame · 🟢 end frame (optional) · 🟡 text (max 4)</div>
+
+            <div>
+              <div class="field-label">Model</div>
+              <div class="native-select"><span class="v">VEO3 — APImart · 4K · $0.50</span><span class="chev">▾</span></div>
+            </div>
+
+            <div>
+              <div class="field-label">Mode</div>
+              <div class="native-select"><span class="v">Generate — new video</span><span class="chev">▾</span></div>
+            </div>
+
+            <div>
+              <div class="field-label">Image use</div>
+              <div class="native-select"><span class="v">Frame — start / end frame</span><span class="chev">▾</span></div>
+            </div>
+
+            <div>
+              <div class="field-label">
+                <span>Prompt (idea)</span>
+                <span class="enhance"><svg class="ico" viewBox="0 0 24 24"><path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2Z"/></svg>Enhance</span>
+              </div>
+              <div class="ta">transisi pagi ke malam cinematic, smooth dolly forward, light camera sway</div>
+              <div style="text-align: right; padding-top: 3px; color: var(--n500); font-size: 10px;">▾</div>
+            </div>
+
+            <div class="grid3">
+              <div>
+                <div class="field-label">Aspect</div>
+                <div class="native-select"><span class="v">16:9</span><span class="chev">▾</span></div>
+              </div>
+              <div>
+                <div class="field-label">Res</div>
+                <div class="native-select"><span class="v">1080p</span><span class="chev">▾</span></div>
+              </div>
+              <div>
+                <div class="field-label">Dur</div>
+                <div class="native-select"><span class="v">5s</span><span class="chev">▾</span></div>
+              </div>
+            </div>
+
+            <label class="check">
+              <span class="box checked"><svg class="ico" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+              Generate audio
+            </label>
+
+            <div class="output-video">
+              <span class="play"><svg class="ico" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="6 4 20 12 6 20 6 4"/></svg></span>
+              <span class="vbar"><i></i></span>
+            </div>
+
+            <div class="usage-badge"><span>running · 24s elapsed · ETA ~1m 20s</span><span style="color:var(--blue-600);">64%</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

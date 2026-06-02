@@ -8,7 +8,7 @@ import {
   useReactFlow,
   type NodeProps,
 } from "@xyflow/react";
-import { FilmIcon, Loader2Icon } from "lucide-react";
+import { FilmIcon, GripVerticalIcon, Loader2Icon } from "lucide-react";
 import { NodeShell } from "./node-shell";
 import { NodeResizerShell } from "./node-resizer-shell";
 import { DownloadButton } from "./download-button";
@@ -17,7 +17,8 @@ import { setNodeOutput } from "@/lib/canvas/actions";
 import { useCanvasStore, type FlowNodeData } from "@/lib/canvas/store";
 import { createClient } from "@/lib/supabase/client";
 import { concatVideos } from "@/lib/video/concat";
-import type { NodeOutput } from "@/lib/canvas/types";
+import type { NodeOutput, SceneComposerParams } from "@/lib/canvas/types";
+import { commitNodeParams } from "./canvas-editor";
 
 type UpstreamClip = {
   nodeId: string;
@@ -28,6 +29,7 @@ type UpstreamClip = {
 export function SceneComposerNode({ data, selected }: NodeProps) {
   const id = useNodeId() ?? "";
   const d = data as FlowNodeData;
+  const params = (d.params ?? {}) as SceneComposerParams;
   const reactFlow = useReactFlow();
   const workflowId = useCanvasStore((s) => s.workflowId);
   const patchNodeData = useCanvasStore((s) => s.patchNodeData);
@@ -39,17 +41,24 @@ export function SceneComposerNode({ data, selected }: NodeProps) {
   const [stage, setStage] = useState<string>("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [zoom, setZoom] = useState<NodeOutput | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
 
-  // Walk upstream edges → ordered list of video clips. Order = the order
-  // edges were added (Postgres returns by id which is gen_random_uuid, so
-  // insertion order isn't guaranteed; we sort by source node y-position
-  // instead so the "topmost" video plays first — matches visual layout).
+  // Walk upstream edges → ordered list of video clips. Order resolution:
+  //   1. If params.order is set, use that (user dragged-to-reorder).
+  //      Newly-connected upstreams (not in order) get appended.
+  //      Removed upstreams get pruned.
+  //   2. Otherwise fall back to source node y-position (topmost plays first).
+  // Edge insertion order isn't trustworthy on its own — postgres edge rows
+  // have gen_random_uuid ids, so client iteration order doesn't match the
+  // order the user wired them. The explicit `order` array makes intent
+  // first-class instead of guessing from layout.
   const upstream = useMemo<UpstreamClip[]>(() => {
     const incoming = allEdges.filter((e) => e.target === id);
     const sourceNodeIds = incoming.map((e) => e.source);
     const sourceNodes = allNodes.filter((n) => sourceNodeIds.includes(n.id));
     sourceNodes.sort((a, b) => a.position.y - b.position.y);
-    return sourceNodes
+    const clips = sourceNodes
       .map((n) => {
         const output = (n.data as FlowNodeData).output;
         if (!output || output.kind !== "video") return null;
@@ -60,7 +69,23 @@ export function SceneComposerNode({ data, selected }: NodeProps) {
         };
       })
       .filter(Boolean) as UpstreamClip[];
-  }, [allEdges, allNodes, id]);
+
+    const explicitOrder = params.order ?? [];
+    if (explicitOrder.length === 0) return clips;
+
+    const byId = new Map(clips.map((c) => [c.nodeId, c]));
+    const ordered: UpstreamClip[] = [];
+    for (const nid of explicitOrder) {
+      const c = byId.get(nid);
+      if (c) {
+        ordered.push(c);
+        byId.delete(nid);
+      }
+    }
+    // Any clip not in the saved order = newly connected → append at the end.
+    for (const c of byId.values()) ordered.push(c);
+    return ordered;
+  }, [allEdges, allNodes, id, params.order]);
 
   // All upstream nodes (including those without video output yet) — used
   // to show "X / Y videos ready" status.
@@ -69,6 +94,14 @@ export function SceneComposerNode({ data, selected }: NodeProps) {
     [allEdges, id],
   );
   const readyCount = upstream.length;
+
+  function reorderTo(targetIdx: number) {
+    if (dragIdx === null || dragIdx === targetIdx) return;
+    const ids = upstream.map((c) => c.nodeId);
+    const [moved] = ids.splice(dragIdx, 1);
+    ids.splice(targetIdx, 0, moved);
+    commitNodeParams(id, { ...params, order: ids });
+  }
 
   async function onCompose() {
     if (!workflowId) return;
@@ -152,21 +185,64 @@ export function SceneComposerNode({ data, selected }: NodeProps) {
           Connect 2+ video outputs to the purple input handle
         </p>
         <div className="rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-950/40 p-2 text-[10px] text-neutral-600 dark:text-neutral-400">
-          <div className="flex items-center gap-1">
-            <FilmIcon className="h-3 w-3" />
-            <span>
+          <div className="flex items-center justify-between gap-1">
+            <span className="flex items-center gap-1">
+              <FilmIcon className="h-3 w-3" />
               {readyCount} / {upstreamNodeCount} clip
               {upstreamNodeCount === 1 ? "" : "s"} ready
             </span>
+            {upstream.length > 1 && (
+              <span className="text-[9px] text-neutral-400">drag to reorder</span>
+            )}
           </div>
           {upstream.length > 0 && (
-            <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-neutral-500">
+            <ul className="nodrag nopan mt-1 space-y-0.5">
               {upstream.map((c, i) => (
-                <li key={c.nodeId} className="truncate">
-                  scene {i + 1} · {c.status}
+                <li
+                  key={c.nodeId}
+                  draggable
+                  onDragStart={(e) => {
+                    setDragIdx(i);
+                    e.dataTransfer.effectAllowed = "move";
+                    // Firefox refuses to start a drag without setData.
+                    e.dataTransfer.setData("text/plain", c.nodeId);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (overIdx !== i) setOverIdx(i);
+                  }}
+                  onDragLeave={() => {
+                    if (overIdx === i) setOverIdx(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    reorderTo(i);
+                    setDragIdx(null);
+                    setOverIdx(null);
+                  }}
+                  onDragEnd={() => {
+                    setDragIdx(null);
+                    setOverIdx(null);
+                  }}
+                  className={`flex cursor-grab items-center gap-1.5 rounded px-1 py-0.5 active:cursor-grabbing ${
+                    dragIdx === i
+                      ? "opacity-40"
+                      : overIdx === i
+                        ? "bg-emerald-500/15"
+                        : "hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+                  }`}
+                >
+                  <GripVerticalIcon className="h-3 w-3 shrink-0 text-neutral-400" />
+                  <span className="tabular-nums text-neutral-400">
+                    {i + 1}.
+                  </span>
+                  <span className="truncate text-neutral-500">
+                    scene · {c.status}
+                  </span>
                 </li>
               ))}
-            </ol>
+            </ul>
           )}
         </div>
         <button

@@ -26,7 +26,8 @@ export type VideoModelId =
   | "skyreels-v4-fast"
   | "grok-imagine-1.0-video-apimart"
   | "sora-2-pro"
-  | "sora-2-vip";
+  | "sora-2-vip"
+  | "Omni-Flash-Ext";
 
 export type VideoModel = {
   id: VideoModelId;
@@ -48,6 +49,13 @@ export type VideoModel = {
   supportsImageUrls: boolean;
   /** Max number of reference images the model accepts. */
   maxImages: number;
+  /**
+   * Exact image counts the model accepts, when it rejects some counts in
+   * between (e.g. Omni-Flash-Ext takes 0, 1, or 3 — but NOT 2). When set, the
+   * client snaps the image count down to the largest allowed value. Omit when
+   * any count up to `maxImages` is valid.
+   */
+  allowedImageCounts?: number[];
   supportsAudio: boolean;
 
   // ---- Quirk handling: per-model field-name and value translations ----
@@ -371,6 +379,24 @@ export const VIDEO_MODELS: VideoModel[] = [
     defaultDuration: 10,
     supportsImageUrls: true,
     maxImages: 3,
+    supportsAudio: false,
+  },
+
+  // --- Omni Flash Ext ---
+  {
+    id: "Omni-Flash-Ext",
+    label: "Omni Flash Ext",
+    vendor: "APImart",
+    // image_urls accepts 0, 1, or 3 images (NOT 2 — API rejects 2 as
+    // unsupported_image_count); 3 = fusion mode.
+    hint: "T2V / I2V, 1 or 3 ref images (not 2)",
+    aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4"],
+    resolutions: ["720p", "1080p", "4k"],
+    durations: [4, 6, 8, 10],
+    defaultDuration: 6,
+    supportsImageUrls: true,
+    maxImages: 3,
+    allowedImageCounts: [0, 1, 3],
     supportsAudio: false,
   },
 ];

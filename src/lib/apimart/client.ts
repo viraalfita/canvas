@@ -227,7 +227,15 @@ export async function submitVideoGenerate(input: VideoGenerateInput) {
       ...(input.imageUrls ?? []),
       ...(input.endFrameUrl ? [input.endFrameUrl] : []),
     ];
-    const imgs = ordered.slice(0, meta.maxImages);
+    let imgs = ordered.slice(0, meta.maxImages);
+    // Some models reject specific counts (e.g. Omni-Flash-Ext accepts 0/1/3 but
+    // not 2). Snap down to the largest allowed count <= what we have.
+    if (meta.allowedImageCounts && !meta.allowedImageCounts.includes(imgs.length)) {
+      const fallback = meta.allowedImageCounts
+        .filter((n) => n <= imgs.length)
+        .reduce((a, b) => Math.max(a, b), 0);
+      imgs = imgs.slice(0, fallback);
+    }
     if (imgs.length > 0) {
       if (meta.imageField === "first_frame_image") {
         body.first_frame_image = imgs[0];

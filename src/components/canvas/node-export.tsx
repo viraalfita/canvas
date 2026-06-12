@@ -7,6 +7,7 @@ import { UsageBadge } from "./usage-badge";
 import { RunNodeButton } from "./run-node-button";
 import { DownloadButton } from "./download-button";
 import { MediaLightbox } from "./media-lightbox";
+import { LazyVideo } from "./lazy-video";
 import { NodeResizerShell } from "./node-resizer-shell";
 import type { FlowNodeData } from "@/lib/canvas/store";
 import type { NodeOutput } from "@/lib/canvas/types";
@@ -52,11 +53,9 @@ export function ExportNode({ data, selected }: NodeProps) {
         )}
         {d.output?.kind === "video" && (
           <>
-            <video
-              src={d.output.url}
-              controls
-              onClick={() => d.output && setZoom(d.output)}
-              className="w-full cursor-zoom-in rounded-md border border-neutral-200 dark:border-neutral-800"
+            <LazyVideo
+              output={d.output}
+              onZoom={() => d.output && setZoom(d.output)}
             />
             <DownloadButton output={d.output} prefix="export" />
           </>

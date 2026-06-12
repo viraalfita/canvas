@@ -9,6 +9,7 @@ import { DownloadButton } from "./download-button";
 import { OutputHistory } from "./output-history";
 import { EnhancePromptButton } from "./enhance-prompt-button";
 import { MediaLightbox } from "./media-lightbox";
+import { LazyVideo } from "./lazy-video";
 import { NodeNameField } from "./node-name-field";
 import { NodeResizerShell } from "./node-resizer-shell";
 import { UpstreamRefs } from "./upstream-refs";
@@ -319,15 +320,14 @@ export function VideoGenerateNode({ data, selected }: NodeProps) {
         )}
         {d.output?.kind === "video" && (
           <>
-            <video
-              src={d.output.url}
-              controls
+            <LazyVideo
+              output={d.output}
+              onZoom={() => d.output && setZoom(d.output)}
               onError={() =>
                 setVidError("Video failed to load. Check Storage policy.")
               }
               onLoadedData={() => setVidError(null)}
-              onClick={() => d.output && setZoom(d.output)}
-              className="mt-1 w-full cursor-zoom-in rounded-md border border-neutral-200 dark:border-neutral-800"
+              className="mt-1"
             />
             <DownloadButton output={d.output} prefix="video-generate" />
           </>

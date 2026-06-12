@@ -13,6 +13,7 @@ import { NodeShell } from "./node-shell";
 import { NodeResizerShell } from "./node-resizer-shell";
 import { DownloadButton } from "./download-button";
 import { MediaLightbox } from "./media-lightbox";
+import { LazyVideo } from "./lazy-video";
 import { setNodeOutput } from "@/lib/canvas/actions";
 import { useCanvasStore, type FlowNodeData } from "@/lib/canvas/store";
 import { createClient } from "@/lib/supabase/client";
@@ -279,11 +280,10 @@ export function SceneComposerNode({ data, selected }: NodeProps) {
         )}
         {d.output?.kind === "video" && (
           <>
-            <video
-              src={d.output.url}
-              controls
-              onClick={() => d.output && setZoom(d.output)}
-              className="mt-1 w-full cursor-zoom-in rounded-md border border-neutral-200 dark:border-neutral-800"
+            <LazyVideo
+              output={d.output}
+              onZoom={() => d.output && setZoom(d.output)}
+              className="mt-1"
             />
             <DownloadButton output={d.output} prefix="composed-video" />
           </>

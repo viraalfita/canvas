@@ -13,8 +13,12 @@ export function UpstreamRefs({ nodeId }: { nodeId: string }) {
   const edges = useCanvasStore((s) => s.edges);
 
   const incoming = edges.filter((e) => e.target === nodeId);
-  const refs = incoming
-    .map((e) => nodes.find((n) => n.id === e.source))
+  // A source can feed this node through multiple handles (e.g. image + end
+  // frame); dedupe by source id so the badge strip shows each ref once and we
+  // don't render duplicate React keys.
+  const sourceIds = Array.from(new Set(incoming.map((e) => e.source)));
+  const refs = sourceIds
+    .map((id) => nodes.find((n) => n.id === id))
     .filter((n): n is NonNullable<typeof n> => Boolean(n))
     .map((n) => {
       const data = n.data as FlowNodeData;

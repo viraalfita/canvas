@@ -571,6 +571,9 @@ function CanvasEditorInner({
             nodeTypes={stableNodeTypes}
             colorMode={colorMode}
             fitView
+            // Skip rendering nodes outside the viewport so panning/zooming on
+            // low-spec machines doesn't transform every off-screen node.
+            onlyRenderVisibleElements
             // Figma-style multi-select: drag empty area = lasso, middle /
             // right click = pan, scroll wheel = pan, Cmd/Ctrl + scroll =
             // zoom. Hold Cmd/Ctrl to add individual nodes to the selection.

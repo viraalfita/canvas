@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { XIcon } from "lucide-react";
 import type { NodeOutput } from "@/lib/canvas/types";
@@ -19,6 +19,8 @@ export function MediaLightbox({
   caption?: string;
   onClose: () => void;
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   // ESC to close — registered only when a media is shown.
   useEffect(() => {
     if (!output) return;
@@ -28,6 +30,16 @@ export function MediaLightbox({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [output, onClose]);
+
+  // When a video lightbox opens, pause every other <video> on the page so the
+  // node's inline (still-playing) video doesn't overlap the lightbox's
+  // autoplaying one — otherwise the same audio plays twice.
+  useEffect(() => {
+    if (!output || output.kind !== "video") return;
+    for (const v of Array.from(document.querySelectorAll("video"))) {
+      if (v !== videoRef.current) v.pause();
+    }
+  }, [output]);
 
   if (!output) return null;
   if (typeof document === "undefined") return null;
@@ -58,6 +70,7 @@ export function MediaLightbox({
           />
         ) : (
           <video
+            ref={videoRef}
             src={output.url}
             controls
             autoPlay

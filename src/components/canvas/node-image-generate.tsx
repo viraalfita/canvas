@@ -16,6 +16,13 @@ import type { NodeOutput } from "@/lib/canvas/types";
 import type { ImageGenerateParams } from "@/lib/canvas/types";
 import type { FlowNodeData } from "@/lib/canvas/store";
 import { commitNodeParams } from "./canvas-editor";
+import { DebouncedTextarea } from "./debounced-textarea";
+
+// Manual prompt-enhancement UI is hidden by default (rarely used). The
+// `enhancedPrompt` param itself is still honored at run time (Storyboard fills
+// it, Text Prompt nodes prepend into it), so this only hides the in-node button
+// + editor. Flip to true to bring the UI back.
+const SHOW_ENHANCE: boolean = false;
 import {
   DEFAULT_IMAGE_MODEL,
   IMAGE_MODELS,
@@ -99,58 +106,57 @@ export function ImageGenerateNode({ data, selected }: NodeProps) {
             <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
               Prompt (idea)
             </span>
-            <EnhancePromptButton
-              idea={params.prompt ?? ""}
-              kind="image"
-              onResult={(enhancedPrompt) => {
-                commitNodeParams(id, { ...params, enhancedPrompt });
-                setShowEnhanced(true);
-              }}
-            />
+            {SHOW_ENHANCE && (
+              <EnhancePromptButton
+                idea={params.prompt ?? ""}
+                kind="image"
+                onResult={(enhancedPrompt) => {
+                  commitNodeParams(id, { ...params, enhancedPrompt });
+                  setShowEnhanced(true);
+                }}
+              />
+            )}
           </div>
-          <textarea
+          <DebouncedTextarea
             value={params.prompt ?? ""}
-            onChange={(e) =>
-              commitNodeParams(id, { ...params, prompt: e.target.value })
-            }
+            onCommit={(prompt) => commitNodeParams(id, { ...params, prompt })}
             placeholder="describe in any language — e.g. wanita minum air ugc realistis"
             rows={2}
             className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
           />
         </label>
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowEnhanced((v) => !v)}
-            title={
-              showEnhanced
-                ? "Hide enhanced prompt"
-                : params.enhancedPrompt
-                  ? "Show enhanced prompt (used at run)"
-                  : "Show enhanced prompt"
-            }
-            className="flex w-full items-center justify-end gap-1 text-[10px] text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
-          >
-            {params.enhancedPrompt && !showEnhanced && (
-              <span aria-hidden>✨</span>
-            )}
-            <span aria-hidden>{showEnhanced ? "▴" : "▾"}</span>
-          </button>
-          {showEnhanced && (
-            <textarea
-              value={params.enhancedPrompt ?? ""}
-              onChange={(e) =>
-                commitNodeParams(id, {
-                  ...params,
-                  enhancedPrompt: e.target.value,
-                })
+        {SHOW_ENHANCE && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowEnhanced((v) => !v)}
+              title={
+                showEnhanced
+                  ? "Hide enhanced prompt"
+                  : params.enhancedPrompt
+                    ? "Show enhanced prompt (used at run)"
+                    : "Show enhanced prompt"
               }
-              placeholder="click ✨ Enhance to generate detailed English prompt here"
-              rows={4}
-              className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
-            />
-          )}
-        </div>
+              className="flex w-full items-center justify-end gap-1 text-[10px] text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
+            >
+              {params.enhancedPrompt && !showEnhanced && (
+                <span aria-hidden>✨</span>
+              )}
+              <span aria-hidden>{showEnhanced ? "▴" : "▾"}</span>
+            </button>
+            {showEnhanced && (
+              <DebouncedTextarea
+                value={params.enhancedPrompt ?? ""}
+                onCommit={(enhancedPrompt) =>
+                  commitNodeParams(id, { ...params, enhancedPrompt })
+                }
+                placeholder="click ✨ Enhance to generate detailed English prompt here"
+                rows={4}
+                className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
+              />
+            )}
+          </div>
+        )}
         <div
           className={`grid gap-2 ${model.resolutions ? "grid-cols-2" : "grid-cols-1"}`}
         >

@@ -14,6 +14,7 @@ import {
 import { NodeShell } from "./node-shell";
 import { NodeResizerShell } from "./node-resizer-shell";
 import { commitNodeParams } from "./canvas-editor";
+import { DebouncedTextarea } from "./debounced-textarea";
 import {
   createImageFromScene,
   createSceneNodesFromStoryboard,
@@ -241,9 +242,9 @@ export function StoryboardNode({ data, selected }: NodeProps) {
         <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
           Story / Idea
         </span>
-        <textarea
+        <DebouncedTextarea
           value={params.story ?? ""}
-          onChange={(e) => update("story", e.target.value)}
+          onCommit={(story) => update("story", story)}
           placeholder="e.g. video 30 detik tentang anak muda mengejar mimpinya di kota besar, cinematic"
           rows={3}
           className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[60px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"

@@ -7,6 +7,7 @@ import { NodeResizerShell } from "./node-resizer-shell";
 import type { TextPromptParams } from "@/lib/canvas/types";
 import type { FlowNodeData } from "@/lib/canvas/store";
 import { commitNodeParams } from "./canvas-editor";
+import { DebouncedTextarea } from "./debounced-textarea";
 
 /**
  * Text Prompt node: a reusable bag of prompt text that downstream Image /
@@ -28,11 +29,9 @@ export function TextPromptNode({ data, selected }: NodeProps) {
           <span className="text-[10px] uppercase text-neutral-600 dark:text-neutral-400">
             Shared prompt (prepended to connected scenes)
           </span>
-          <textarea
+          <DebouncedTextarea
             value={params.text ?? ""}
-            onChange={(e) =>
-              commitNodeParams(id, { ...params, text: e.target.value })
-            }
+            onCommit={(text) => commitNodeParams(id, { ...params, text })}
             placeholder="e.g. cinematic, 4k, soft natural lighting, shot on 35mm…"
             rows={5}
             className="nodrag nopan nowheel mt-1 w-full resize-y field-sizing-content min-h-[80px] max-h-[400px] rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-950 p-2 text-xs outline-none focus:border-neutral-500"
